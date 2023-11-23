@@ -32,23 +32,28 @@ namespace Gossamer {
     template<typename RNG, typename Container>
     void sampleWithoutReplacement(RNG& rng, uint32_t n, uint64_t k, Container& container)
     {
-        std::uniform_real_distribution<double> unif(0, 1);
-
         switch (k) {
         case 0:
             return;
         case 1:
+        {
             container.reserve(1);
-            container.push_back((uint64_t)(n * unif(rng)));
+            std::uniform_int_distribution<uint64_t> unif(0, n);
+            container.push_back(unif(rng));
             return;
+        }
         case 2:
+        {
             container.reserve(2);
-            uint64_t x1 = n * unif(rng);
-            uint64_t x2 = (n - 1) * unif(rng);
+            std::uniform_int_distribution<uint64_t> unif1(0, n);
+            uint64_t x1 = n * unif1(rng);
+            std::uniform_int_distribution<uint64_t> unif2(0, n - 1);
+            uint64_t x2 = (n - 1) * unif2(rng);
             if (x1 == x2) x2 = n - 1;
             container.push_back(x1);
             container.push_back(x2);
             return;
+        }
         }
 
         uint64_t hashTableSize = std::max<uint64_t>((uint64_t)1 << (Gossamer::log2(uint64_t(k) + ((k+1) >> 1)) + 1), 32);
@@ -62,7 +67,8 @@ namespace Gossamer {
         container.resize(containerBase + k);
 
         for (uint32_t i = 0; i < k; ++i) {
-            uint64_t j = (uint64_t)((n - i) * unif(rng));
+            std::uniform_int_distribution<uint64_t> unif(0, n - i);
+            uint64_t j = unif(rng);
             uint64_t h;
             for (h = j & hashTableMask; ; h = (h + 1) & hashTableMask) {
                 if (!hashTable[h].link) {
