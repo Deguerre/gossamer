@@ -804,7 +804,7 @@ GossCmdFactoryScaffold::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdScaffold(in, c, x));
+    return make_goss_cmd<GossCmdScaffold>(in, c, x);
 }
 
 GossCmdFactoryScaffold::GossCmdFactoryScaffold()

@@ -11,11 +11,17 @@
 
 #include <string>
 
-using namespace std;
 
 void
-KmerSet::remove(const string& pBaseName, FileFactory& pFactory)
+KmerSet::remove(const std::string& pBaseName, FileFactory& pFactory)
 {
     pFactory.remove(pBaseName + ".header");
     SparseArray::remove(pBaseName + ".kmers", pFactory);
+}
+
+
+void
+KmerSet::prepopulate()
+{
+    mKmers.prepopulate();
 }

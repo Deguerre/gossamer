@@ -320,7 +320,9 @@ class FibHeap : private boost::noncopyable
             return;
         }
 
-        std::vector<node_ptr> newRoots(mMaxDegree + 1);
+        std::vector<node_ptr> newRoots;
+        newRoots.reserve(std::numeric_limits<std::size_t>::digits);
+        newRoots.resize(mMaxDegree + 1);
         node_ptr currentPtr = mRoot->mNext;
         mMaxDegree = 0; 
         do

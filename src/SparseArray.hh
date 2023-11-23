@@ -117,15 +117,22 @@ public:
             ++mHeader.count;
         }
 
+        void push_block(const position_type* pBegin, const position_type* pEnd)
+        {
+            for (auto ii = pBegin; ii != pEnd; ++ii) {
+                push_back(*ii);
+            }
+        }
+
         void end(const position_type& pN);
 
         Builder(const std::string& pBaseName, FileFactory& pFactory, const position_type& pN, rank_type pM);
 
         Builder(const std::string& pBaseName, FileFactory& pFactory, uint64_t pD);
 
-    private:
         static uint64_t d(const position_type& pN, rank_type pM);
 
+    private:
         Header mHeader;
         rank_type mBitNum;
         rank_type mLastHighBit;
@@ -179,6 +186,8 @@ public:
         bool mValid;
 
         Iterator(const SparseArray& pArray);
+
+        Iterator(const SparseArray& pArray, rank_type pBeginRank);
     };
 
     // TODO: Consolidate with Iterator
@@ -226,6 +235,11 @@ public:
     Iterator iterator() const
     {
         return Iterator(*this);
+    }
+
+    Iterator iteratorFromRank(rank_type pRank) const
+    {
+        return Iterator(*this, pRank);
     }
 
     static LazyIterator lazyIterator(const std::string& pBaseName, FileFactory& pFactory)
@@ -334,6 +348,8 @@ public:
     }
 
     PropertyTree stat() const;
+
+    void prepopulate();
 
     static void remove(const std::string& pBaseName, FileFactory& pFactory);
 

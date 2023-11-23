@@ -146,7 +146,7 @@ GossCmdFactoryTrimGraph::create(App& pApp, const variables_map& pOpts)
         inferCutoff = true;
     }
 
-    optional<uint64_t> scaleCutoffByK;
+    std::optional<uint64_t> scaleCutoffByK;
     chk.getOptional("scale-cutoff-by-k", scaleCutoffByK);
 
     bool estimateOnly = false;
@@ -168,7 +168,7 @@ GossCmdFactoryTrimGraph::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdTrimGraph(in, out, c, inferCutoff, estimateOnly, scaleCutoffByK));
+    return make_goss_cmd<GossCmdTrimGraph>(in, out, c, inferCutoff, estimateOnly, scaleCutoffByK);
 }
 
 GossCmdFactoryTrimGraph::GossCmdFactoryTrimGraph()

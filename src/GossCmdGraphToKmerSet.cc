@@ -70,7 +70,7 @@ GossCmdFactoryGraphToKmerSet::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdGraphToKmerSet(in, out));
+    return make_goss_cmd<GossCmdGraphToKmerSet>(in, out);
 }
 
 GossCmdFactoryGraphToKmerSet::GossCmdFactoryGraphToKmerSet()

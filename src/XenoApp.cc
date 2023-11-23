@@ -57,20 +57,19 @@ namespace // anonymous
             // Assume 0.2 GB operating overhead.
             const uint64_t M = (mM - 0.2) * 1024 * 1024 * 1024;
             const uint64_t S = BackyardHash::maxSlotBits(M);
-            const uint64_t N = M / (1.5 * sizeof(uint32_t) + sizeof(BackyardHash::value_type));
 
             string g = mOut + "-graft";
             string h = mOut + "-host";
             string b = mOut + "-both";
 
             log(info, "building graft reference kmer set");
-            GossCmdBuildKmerSet(mK, S, N, mT, g, strings(1, mGraft), strings(), strings())(pCxt);
+            GossCmdBuildKmerSet(mK, S, M, mT, g, strings(1, mGraft), strings(), strings())(pCxt);
 
             log(info, "building host reference kmer set");
-            GossCmdBuildKmerSet(mK, S, N, mT, h, strings(1, mHost), strings(), strings())(pCxt);
+            GossCmdBuildKmerSet(mK, S, M, mT, h, strings(1, mHost), strings(), strings())(pCxt);
 
             log(info, "merging host and graft reference kmer sets");
-            GossCmdMergeAndAnnotateKmerSets(g, h, b)(pCxt);
+            GossCmdMergeAndAnnotateKmerSets(mT, M, g, h, b)(pCxt);
 
             log(info, "computing marginal kmers");
             GossCmdComputeNearKmers(b, mT)(pCxt);
@@ -120,7 +119,7 @@ namespace // anonymous
 
             chk.throwIfNecessary(pApp);
 
-            return GossCmdPtr(new XenoCmdIndex(graft, host, out, K, M, T));
+            return make_goss_cmd<XenoCmdIndex>(graft, host, out, K, M, T);
         }
 
         XenoCmdFactoryIndex()
@@ -225,8 +224,8 @@ namespace // anonymous
 
             chk.throwIfNecessary(pApp);
 
-            return GossCmdPtr(new XenoCmdGroup(in, fastas, fastqs, lines, pairs, M, T, 
-                                               graftName, hostName, prefix, noOut, ord));
+            return make_goss_cmd<XenoCmdGroup>(in, fastas, fastqs, lines, pairs, M, T, 
+                                               graftName, hostName, prefix, noOut, ord);
         }
 
         XenoCmdFactoryGroup()

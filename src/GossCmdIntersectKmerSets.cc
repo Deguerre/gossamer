@@ -147,7 +147,7 @@ GossCmdFactoryIntersectKmerSets::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdIntersectKmerSets(ins, out));
+    return make_goss_cmd<GossCmdIntersectKmerSets>(ins, out);
 }
 
 GossCmdFactoryIntersectKmerSets::GossCmdFactoryIntersectKmerSets()

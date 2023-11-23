@@ -83,6 +83,11 @@ public:
             i->second.print(pOut, pInd + 1);
         }
     }
+
+    PropertyTree()
+    {
+    }
+
 private:
     static void ind(std::ostream& pOut, uint64_t pInd)
     {

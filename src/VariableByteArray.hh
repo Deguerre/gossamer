@@ -226,8 +226,6 @@ public:
 
     value_type operator[](uint64_t pIndex) const
     {
-        using namespace std;
-
         value_type result = static_cast<value_type>(mOrder0[pIndex]);
         uint64_t r1;
         if (!mOrder1Present.accessAndRank(bitmap_traits::init(pIndex), r1))

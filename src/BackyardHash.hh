@@ -24,9 +24,9 @@
 #define STDINT_H
 #endif
 
-#ifndef BOOST_ATOMIC_HPP
-#include <boost/atomic.hpp>
-#define BOOST_ATOMIC_HPP
+#ifndef STD_ATOMIC
+#include <atomic>
+#define STD_ATOMIC
 #endif
 
 #ifndef GOSSAMER_HH
@@ -40,6 +40,7 @@
 #ifndef SPINLOCK_HH
 #include "Spinlock.hh"
 #endif
+
 
 /**
  * The BackyardHash is a hash table which uses ideas from succinct data structures
@@ -79,9 +80,10 @@ public:
 
     /// L governs the number of locks to use: the number of locks is 2^L
     /// irrespective of the number of hash slots.
-    static const uint64_t L = 16;
+    static const uint64_t L = 18;
 
     typedef Gossamer::edge_type value_type;
+    static_assert(value_type::value_type::representation_type::sHaveSingleWord);
 
     /**
      * A Hash object contains the result of the invertable hash:
@@ -98,6 +100,11 @@ public:
         const value_type& value() const
         {
             return mValue;
+        }
+
+        Hash()
+            : mSlot(0), mValue(0)
+        {
         }
 
         Hash(uint64_t pSlot, const value_type& pValue)
@@ -212,8 +219,8 @@ public:
      */
     uint64_t spills()
     {
-        SpinlockHolder lk(mOtherMutex);
-        return mOther.size();
+        SpinlockHolder lk(mBackyardMutex);
+        return mBackyard.size();
     }
 
     /**
@@ -231,8 +238,8 @@ public:
         }
 
         pIdx -= mItems.size();
-        BOOST_ASSERT(mOtherIndex.size() == mOther.size());
-        return mOtherIndex[pIdx];
+        BOOST_ASSERT(mBackyardIndex.size() == mBackyard.size());
+        return mBackyardIndex[pIdx];
     }
 
     /**
@@ -250,8 +257,8 @@ public:
         }
 
         pIdx -= mItems.size();
-        BOOST_ASSERT(mOtherIndex.size() == mOther.size());
-        value_type v = valueBits(mOtherIndex[pIdx].first);
+        BOOST_ASSERT(mBackyardIndex.size() == mBackyard.size());
+        value_type v = valueBits(mBackyardIndex[pIdx].first);
         v <<= mCountBits + mHashNumBits;
         return v.mostSigWord();
     }
@@ -288,8 +295,8 @@ public:
                 s += (1ULL << mSlotBits);
             }
         }
-        std::unordered_map<value_type,uint64_t>::const_iterator i = mOther.find(pItem);
-        if (i != mOther.end())
+        std::unordered_map<value_type,uint64_t>::const_iterator i = mBackyard.find(pItem);
+        if (i != mBackyard.end())
         {
             c += i->second;
         }
@@ -315,7 +322,7 @@ public:
             value_type k = unhash(i & mSlotMask, x.hash(), x.value());
             pVisitor(i, k, c);
         }
-        BOOST_ASSERT(mOtherIndex.size() == mOther.size());
+        BOOST_ASSERT(mOtherIndex.size() == mBackyard.size());
         for (uint64_t j = 0; j < mOtherIndex.size(); ++j, ++i)
         {
             pVisitor(i, mOtherIndex[j].first, mOtherIndex[j].second);
@@ -335,8 +342,8 @@ public:
             }
             pVisitor(i);
         }
-        BOOST_ASSERT(mOtherIndex.size() == mOther.size());
-        for (uint64_t j = 0; j < mOtherIndex.size(); ++j, ++i)
+        BOOST_ASSERT(mBackyardIndex.size() == mBackyard.size());
+        for (uint64_t j = 0; j < mBackyardIndex.size(); ++j, ++i)
         {
             pVisitor(i);
         }
@@ -369,8 +376,8 @@ public:
         {
             mItems[i] = value_type(0);
         }
-        mOther.clear();
-        mOtherIndex.clear();
+        mBackyard.clear();
+        mBackyardIndex.clear();
         mSize = 0;
         mSpills = 0;
         mPanics = 0;
@@ -378,9 +385,9 @@ public:
 
     void index() const
     {
-        mOtherIndex.clear();
-        for (auto& j : mOther) {
-            mOtherIndex.push_back(j);
+        mBackyardIndex.clear();
+        for (auto& j : mBackyard) {
+            mBackyardIndex.push_back(j);
         }
     }
 
@@ -390,7 +397,7 @@ public:
         PropertyTree t;
         t.putProp("cuckoo-size", mSize);
         t.putProp("cuckoo-load", d);
-        t.putProp("spill-items", mOther.size());
+        t.putProp("spill-items", mBackyard.size());
         t.putProp("count-spills", mSpills);
         t.putProp("panic-spills", mPanics);
         return t;
@@ -504,6 +511,7 @@ private:
 
     static uint64_t hash0(const value_type& pKey)
     {
+#if 0
         std::pair<const uint64_t*,const uint64_t*> v = pKey.words();
         const uint64_t* b = v.first;
         const uint64_t* e = v.second;
@@ -538,7 +546,9 @@ private:
             }
         }
         return h;
-
+#else
+        return pKey.value().hash();
+#endif
     }
 
     static void mix64(uint64_t& a, uint64_t& b, uint64_t& c)
@@ -609,15 +619,17 @@ private:
     const uint64_t mCountBits;
     const uint64_t mCountMask;
 
-    std::vector<value_type> mItems;
     std::vector<Spinlock> mMutexes;
-    Spinlock mOtherMutex;
-    std::unordered_map<value_type,uint64_t> mOther;
-    mutable std::vector<std::pair<value_type,uint64_t> > mOtherIndex;
-    boost::atomic<uint64_t> mRandom;
-    boost::atomic<uint64_t> mSize;
-    boost::atomic<uint64_t> mSpills;
-    boost::atomic<uint64_t> mPanics;
+    std::vector<value_type> mItems;
+    Spinlock mBackyardMutex;
+    std::unordered_map<value_type,uint64_t> mBackyard;
+    mutable std::vector<std::pair<value_type,uint64_t>> mBackyardIndex;
+    value_type mValueCountMask;
+    value_type mValueNonCountMask;
+    std::atomic<uint64_t> mRandom;
+    std::atomic<uint64_t> mSize;
+    std::atomic<uint64_t> mSpills;
+    std::atomic<uint64_t> mPanics;
 };
 
 #endif // BACKYARDHASH_HH

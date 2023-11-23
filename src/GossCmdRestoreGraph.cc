@@ -141,7 +141,7 @@ GossCmdFactoryRestoreGraph::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdRestoreGraph(in, out));
+    return make_goss_cmd<GossCmdRestoreGraph>(in, out);
 }
 
 GossCmdFactoryRestoreGraph::GossCmdFactoryRestoreGraph()

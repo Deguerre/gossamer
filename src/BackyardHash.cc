@@ -15,6 +15,7 @@
 using namespace std;
 using namespace boost;
 
+
 namespace // anonymous
 {
     class IdxAccumulator
@@ -142,33 +143,42 @@ BackyardHash::insert(const value_type& pItem)
     //cerr << "p.slot() = " << p.slot() << endl;
     //cerr << "p.hash() = " << p.hash() << endl;
 
+    Hash h[J];
+    value_type item[J];
     for (uint64_t j = 0; j < J; ++j)
     {
-        Hash h = hash(p, j);
-        uint64_t s0 = h.slot();
+        h[j] = hash(p, j);
+        item[j] = pack(j, 0, h[j].value());
+    }
+
+    for (uint64_t j = 0; j < J; ++j)
+    {
+        uint64_t s0 = h[j].slot();
         uint64_t s = s0;
         while (s < mItems.size())
         {
+            Gossamer::cache_prefetch_l1_read(&mItems[s]);
             SpinlockHolder lk(mMutexes[lockNum(s0)]);
-            Content x = unpack(mItems[s]);
-            if (x.hash() == j && x.count() > 0 && unhash(s0, j, x.value()) == pItem)
+            if (value_type::equalWithMask(mItems[s], item[j], mValueNonCountMask) && value_type::testAgainstMask(mItems[s], mValueCountMask))
             {
-                BOOST_ASSERT(x.value() == h.value());
+                Content x = unpack(mItems[s]);
+                BOOST_ASSERT(x.value() == h[j].value());
                 uint64_t c = x.count() + 1;
                 if (c <= mCountMask)
                 {
-                    mItems[s] = pack(j, c, h.value());
+                    mItems[s] = pack(j, c, h[j].value());
                     return;
                 }
                 else
                 {
                     mItems[s] = value_type(0);
-                    SpinlockHolder lk(mOtherMutex);
-                    if (mOther.find(pItem) == mOther.end())
+                    lk.unlock();
+                    SpinlockHolder lk(mBackyardMutex);
+                    if (mBackyard.find(pItem) == mBackyard.end())
                     {
                         ++mSpills;
                     }
-                    mOther[pItem] += c;
+                    mBackyard[pItem] += c;
                     return;
                 }
             }
@@ -183,9 +193,8 @@ BackyardHash::insert(const value_type& pItem)
     // instruction!) and the locking.
     if (0)
     {
-        SpinlockHolder lk(mOtherMutex);
-        std::unordered_map<value_type,uint64_t>::iterator i = mOther.find(pItem);
-        if (i != mOther.end())
+        SpinlockHolder lk(mBackyardMutex);
+        if (auto i = mBackyard.find(pItem); i != mBackyard.end())
         {
             i->second++;
             return;
@@ -205,6 +214,7 @@ BackyardHash::insert(const value_type& pItem)
         uint64_t s = s0;
         while (s < mItems.size())
         {
+            Gossamer::cache_prefetch_l1_write(&mItems[s]);
             //cerr << s << '\t' << lexical_cast<string>(k) << endl;
             value_type vOld;
             value_type vNew = pack(j, c, h.value());
@@ -213,11 +223,11 @@ BackyardHash::insert(const value_type& pItem)
                 vOld = mItems[s];
                 mItems[s] = vNew;
             }
-            Content x = unpack(vOld);
-            if (x.count() == 0)
+            if (!value_type::testAgainstMask(vOld, mValueCountMask))
             {
                 return;
             }
+            Content x = unpack(vOld);
             s += (1ULL << mSlotBits);
             j = x.hash();
             c = x.count();
@@ -232,13 +242,13 @@ BackyardHash::insert(const value_type& pItem)
     //cerr << "cuckoo insert failed" << endl;
 
     // Too hard. Let's just drop the item into the spill table.
-    SpinlockHolder lk(mOtherMutex);
-    if (mOther.find(k) == mOther.end())
+    SpinlockHolder lk(mBackyardMutex);
+    if (mBackyard.find(k) == mBackyard.end())
     {
         ++mPanics;
     }
-    mOther[k] += c;
-    BOOST_ASSERT(mPanics + mSpills == mOther.size());
+    mBackyard[k] += c;
+    BOOST_ASSERT(mPanics + mSpills == mBackyard.size());
 }
 
 void
@@ -275,12 +285,10 @@ BackyardHash::BackyardHash(uint64_t pSlotBits, uint64_t pItemBits, uint64_t pNum
       mHashNumBits(2), mHashNumMask((1ULL << mHashNumBits) - 1),
       mCountBits(8 * sizeof(value_type) - pItemBits + min(pItemBits, mSlotBits) - mHashNumBits),
       mCountMask((1ULL << min(static_cast<uint64_t>(63), mCountBits)) - 1),
-      mItems(pNumSlots), mMutexes(1ULL << L), mRandom(0), mSize(0), mSpills(0), mPanics(0)
+      mMutexes(uint64_t(1) << L), mItems(pNumSlots), mRandom(0), mSize(0), mSpills(0), mPanics(0)
 {
-#if 0
-    uint64_t radixBits = mItemBits - mSlotBits;
-    uint64_t s = 1ULL << pSlotBits;
-    std::cerr << pSlotBits << '\t' << pNumSlots << '\t' << s << '\t' << (1.0 * pNumSlots / s) << std::endl;
-#endif
+    mValueCountMask = value_type(mCountMask);
+    mValueCountMask <<= mHashNumBits;
+    mValueNonCountMask = ~mValueCountMask;
 }
 

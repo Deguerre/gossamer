@@ -20,10 +20,10 @@ constexpr uint64_t DenseSelect::version;
 inline
 DenseSelect::Header::Header(const bool pInvertSense)
     : version(DenseSelect::version),
-      indexArrayOffset(0), rankArrayOffset(0),
+      indexRankArrayOffset(0),
       logBlockSize(sLogDefBlockSize), blockSize(sDefBlockSize),
       logSampleRate(sLogDefSampleRate), sampleRate(sDefSampleRate),
-      numBlocks(0), indexSize(0),
+      numBlocks(0), indexRankSize(0),
       smallBlocks(0), smallBlocksSize(0),
       intermediateBlocks(0), intermediateBlocksSize(0),
       largeBlocks(0), largeBlocksSize(0)
@@ -86,8 +86,7 @@ DenseSelect::DenseSelect(const WordyBitVector& pBitVector,
         }
     }
 
-    mIndex = reinterpret_cast<const uint64_t*>(mData + mHeader.indexArrayOffset);
-    mRank = reinterpret_cast<const uint64_t*>(mData + mHeader.rankArrayOffset);
+    mIndexRank = reinterpret_cast<const uint64_t*>(mData + mHeader.indexRankArrayOffset);
 }
 
 
@@ -101,35 +100,49 @@ DenseSelect::stat() const
     t.putProp("invertSense", mHeader.flags[Header::kInvertSense]);
 
     {
-        PropertyTree index;
-        index.putProp("entries", mHeader.numBlocks);
-        index.putProp("size", mHeader.indexSize);
-        t.putSub("index", index);
+        PropertyTree indexRank;
+        indexRank.putProp("entries", mHeader.numBlocks);
+        indexRank.putProp("size", mHeader.indexRankSize);
+        t.putSub("indexRank", indexRank);
     }
 
     {
-        PropertyTree small;
-        small.putProp("entries", mHeader.smallBlocks);
-        small.putProp("size", mHeader.smallBlocksSize);
-        t.putSub("smallBlocks", small);
+        PropertyTree smalldex;
+        smalldex.putProp("entries", mHeader.smallBlocks);
+        smalldex.putProp("size", mHeader.smallBlocksSize);
+        t.putSub("smallBlocks", smalldex);
     }
 
     {
-        PropertyTree intermediate;
-        intermediate.putProp("entries", mHeader.intermediateBlocks);
-        intermediate.putProp("size", mHeader.intermediateBlocksSize);
-        t.putSub("intermediateBlocks", intermediate);
+        PropertyTree intermediatedex;
+        intermediatedex.putProp("entries", mHeader.intermediateBlocks);
+        intermediatedex.putProp("size", mHeader.intermediateBlocksSize);
+        t.putSub("intermediateBlocks", intermediatedex);
     }
 
     {
-        PropertyTree large;
-        large.putProp("entries", mHeader.largeBlocks);
-        large.putProp("size", mHeader.largeBlocksSize);
-        t.putSub("largeBlocks", large);
+        PropertyTree largedex;
+        largedex.putProp("entries", mHeader.largeBlocks);
+        largedex.putProp("size", mHeader.largeBlocksSize);
+        t.putSub("largeBlocks", largedex);
     }
 
     return t;
 }
+
+
+void
+DenseSelect::prepopulate() const
+{
+#ifdef GOSS_PLATFORM_WINDOWS
+    WIN32_MEMORY_RANGE_ENTRY range = {
+        (PVOID)mFileHolder->data(), mFileHolder->size()
+    };
+    ::PrefetchVirtualMemory(::GetCurrentProcess(), 1, &range, 0);
+#endif
+}
+
+
 
 
 uint64_t
@@ -181,8 +194,8 @@ uint64_t
 DenseSelect::select(uint64_t i) const
 {
     uint64_t blockNum = i >> mHeader.logBlockSize;
-    uint64_t startRank = mRank[blockNum];
-    uint64_t il = mIndex[blockNum];
+    uint64_t il = mIndexRank[blockNum*2+0];
+    uint64_t startRank = mIndexRank[blockNum*2+1];
     const uint8_t* block = mData + (il & ~sBlockTypeMask);
 
     uint64_t subBlockOffset
@@ -262,8 +275,8 @@ DenseSelect::select(uint64_t i, uint64_t j) const
         return make_pair(select(i), select(j));
     }
 
-    uint64_t startRank = mRank[idxi];
-    uint64_t index = mIndex[idxi];
+    uint64_t index = mIndexRank[idxi*2+0];
+    uint64_t startRank = mIndexRank[idxi*2+1];
     const uint8_t* block = mData + (index & ~sBlockTypeMask);
 
     uint64_t sbi = (i & (mHeader.blockSize - 1)) >> mHeader.logSampleRate;
@@ -451,8 +464,7 @@ DenseSelect::Builder::flush()
         return;
     }
 
-    Gossamer::ensureCapacity(mIndex);
-    Gossamer::ensureCapacity(mRank);
+    Gossamer::ensureCapacity(mIndexRank, 2);
 
     uint64_t fileposition = mFile.tellp();
     BOOST_ASSERT(!(fileposition & sBlockTypeMask));
@@ -461,7 +473,6 @@ DenseSelect::Builder::flush()
     uint64_t p = mCurrBlock.back();
     uint64_t blockSize = p - pp;
 
-    mRank.push_back(pp);
     if (blockSize >= sIntermediateBlock
         || mCurrBlock.size() < mHeader.blockSize)
     {
@@ -475,7 +486,7 @@ DenseSelect::Builder::flush()
                 mFile.write(reinterpret_cast<const char*>(&pos), sizeof(pos));
                 mHeader.largeBlocksSize += sizeof(pos);
             }
-            mIndex.push_back(fileposition | tFullSpill32);
+            mIndexRank.push_back(fileposition | tFullSpill32);
             ++mHeader.largeBlocks;
         }
         else
@@ -488,7 +499,7 @@ DenseSelect::Builder::flush()
                 mFile.write(reinterpret_cast<const char*>(&pos), sizeof(pos));
                 mHeader.largeBlocksSize += sizeof(pos);
             }
-            mIndex.push_back(fileposition | tFullSpill64);
+            mIndexRank.push_back(fileposition | tFullSpill64);
             ++mHeader.largeBlocks;
         }
     }
@@ -626,7 +637,7 @@ DenseSelect::Builder::flush()
             }
         }
 
-        mIndex.push_back(fileposition | tIntermediate);
+        mIndexRank.push_back(fileposition | tIntermediate);
         ++mHeader.intermediateBlocks;
     }
     else
@@ -638,9 +649,10 @@ DenseSelect::Builder::flush()
             mFile.write(reinterpret_cast<const char*>(&s), sizeof(s));
             mHeader.smallBlocksSize += sizeof(s);
         }
-        mIndex.push_back(fileposition | tSmall);
+        mIndexRank.push_back(fileposition | tSmall);
         ++mHeader.smallBlocks;
     }
+    mIndexRank.push_back(pp);
     mCurrBlock.clear();
     alignFilePos(sBlockTypeMask);
     ++mHeader.numBlocks;
@@ -654,20 +666,12 @@ DenseSelect::Builder::end()
 
     alignFilePos((1ull << 4) - 1);
 
-    mHeader.indexArrayOffset = mFile.tellp();
-    if( mIndex.size() != 0 )
+    mHeader.indexRankArrayOffset = mFile.tellp();
+    if( mIndexRank.size() != 0 )
     {
-        mFile.write(reinterpret_cast<const char*>(&mIndex[0]),
-                    mIndex.size() * sizeof(mIndex[0]));
-        mHeader.indexSize += mIndex.size() * sizeof(mIndex[0]);
-    }
-
-    mHeader.rankArrayOffset = mFile.tellp();
-    if( mRank.size() != 0 )
-    {
-        mFile.write(reinterpret_cast<const char*>(&mRank[0]),
-                    mRank.size() * sizeof(mRank[0]));
-        mHeader.indexSize += mRank.size() * sizeof(mRank[0]);
+        mFile.write(reinterpret_cast<const char*>(&mIndexRank[0]),
+                    mIndexRank.size() * sizeof(mIndexRank[0]));
+        mHeader.indexRankSize += mIndexRank.size() * sizeof(mIndexRank[0]);
     }
 
     mFile.seekp(0, ios_base::beg);
@@ -865,6 +869,7 @@ DenseArray::remove(const string& pBaseName, FileFactory& pFactory)
     pFactory.remove(pBaseName + ".select");
     pFactory.remove(pBaseName + ".rank");
 }
+
 
 
 DenseArray::DenseArray(const string& pBaseName, FileFactory& pFactory)

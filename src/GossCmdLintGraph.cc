@@ -261,7 +261,7 @@ GossCmdFactoryLintGraph::create(App& pApp, const variables_map& pOpts)
     bool dumpProperties;
     chk.getOptional("dump-properties", dumpProperties);
 
-    return GossCmdPtr(new GossCmdLintGraph(in, dumpProperties));
+    return make_goss_cmd<GossCmdLintGraph>(in, dumpProperties);
 }
 
 

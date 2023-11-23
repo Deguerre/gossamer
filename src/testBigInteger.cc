@@ -196,6 +196,43 @@ BOOST_AUTO_TEST_CASE(test_shift_128)
     BOOST_CHECK_EQUAL(lexical_cast<string>(a), "170141183460469231731687303715884105728");
     a >>= 127;
     BOOST_CHECK_EQUAL(lexical_cast<string>(a), "1");
+
+    BigInteger<2> b(Gossamer::sPhi0);
+    b <<= 64;
+    b |= BigInteger<2>(Gossamer::sPhi1);
+    BOOST_CHECK_EQUAL(b.mostSigWord(), Gossamer::sPhi0);
+    BOOST_CHECK_EQUAL(b.asUInt64(), Gossamer::sPhi1);
+    {
+        BigInteger<2> x = b;
+        x <<= 0;
+        BOOST_CHECK_EQUAL(x, b);
+        x >>= 0;
+        BOOST_CHECK_EQUAL(x, b);
+    }
+    for (unsigned i = 1; i < 64; ++i) {
+        BigInteger<2> x = b;
+        x <<= i;
+        BOOST_CHECK_EQUAL(x.mostSigWord(), (Gossamer::sPhi0 << i) | (Gossamer::sPhi1 >> (64 - i)));
+        BOOST_CHECK_EQUAL(x.asUInt64(), Gossamer::sPhi1 << i);
+    }
+    for (unsigned i = 64; i < 128; ++i) {
+        BigInteger<2> x = b;
+        x <<= i;
+        BOOST_CHECK_EQUAL(x.mostSigWord(), Gossamer::sPhi1 << (i - 64));
+        BOOST_CHECK_EQUAL(x.asUInt64(), 0);
+    }
+    for (unsigned i = 1; i < 64; ++i) {
+        BigInteger<2> x = b;
+        x >>= i;
+        BOOST_CHECK_EQUAL(x.mostSigWord(), Gossamer::sPhi0 >> i);
+        BOOST_CHECK_EQUAL(x.asUInt64(), (Gossamer::sPhi0 << (64 - i)) | (Gossamer::sPhi1 >> i));
+    }
+    for (unsigned i = 64; i < 128; ++i) {
+        BigInteger<2> x = b;
+        x >>= i;
+        BOOST_CHECK_EQUAL(x.mostSigWord(), 0);
+        BOOST_CHECK_EQUAL(x.asUInt64(), Gossamer::sPhi0 >> (i - 64));
+    }
 }
 
 BOOST_AUTO_TEST_CASE(test_bitwise_128)
@@ -333,6 +370,21 @@ BOOST_AUTO_TEST_CASE(test_shift_word_size)
     BOOST_CHECK_EQUAL(lexical_cast<string>(w), "18446744073709551616");
     w >>= 64;
     BOOST_CHECK_EQUAL(lexical_cast<string>(w), "1");
+}
+
+
+BOOST_AUTO_TEST_CASE(test_hash)
+{
+    BigInteger<2> a(21324132ull), b(12352979213ull);
+    a <<= 64;
+    a += BigInteger<2>(120528743928ull);
+    b <<= 64;
+    b += BigInteger<2>(83496121239692ull);
+    auto [ha1, hb1] = BigInteger<2>::hash2(a, b);
+    auto ha2 = a.hash();
+    auto hb2 = b.hash();
+    BOOST_CHECK_EQUAL(ha1, ha2);
+    BOOST_CHECK_EQUAL(hb1, hb2);
 }
 
 

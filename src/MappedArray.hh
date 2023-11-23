@@ -70,6 +70,11 @@ public:
             mFile.write(reinterpret_cast<const char*>(&pItem), sizeof(T));
         }
 
+        void push_back_multiple(const T* pItems, size_t count)
+        {
+            mFile.write(reinterpret_cast<const char*>(pItems), sizeof(T) * count);
+        }
+
         void end()
         {
         }
@@ -114,6 +119,12 @@ public:
         uint64_t size() const
         {
             return mArray->size();
+        }
+
+        T setPosition(uint64_t pPos)
+        {
+            mPos = pPos;
+            return (*mArray)[mPos];
         }
 
         Iterator(const MappedArray<T>* pArray)
@@ -178,6 +189,13 @@ public:
             next();
         }
 
+        T setPosition(uint64_t pPos)
+        {
+            mIn.seekg(pPos, std::ios_base::beg);
+            mPos = pPos;
+            return (*mArray)[mPos];
+        }
+
     private:
         
         void next()
@@ -191,7 +209,7 @@ public:
         FileFactory::InHolderPtr mInHolder;
         std::istream& mIn;
         uint64_t mSize;
-        boost::shared_ptr<T> mBuffer;
+        std::shared_ptr<T> mBuffer;
         uint64_t mPos;
     };
 

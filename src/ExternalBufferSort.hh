@@ -125,7 +125,7 @@ public:
         FileFactory& mFactory;
         std::vector<uint8_t> mBuffer;
     };
-    typedef boost::shared_ptr<BufferedFile> BufferedFilePtr;
+    typedef std::shared_ptr<BufferedFile> BufferedFilePtr;
 
     template <typename Vec>
     void push_back(const Vec& pItem)

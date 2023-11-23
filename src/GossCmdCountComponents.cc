@@ -336,7 +336,7 @@ GossCmdFactoryCountComponents::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdCountComponents(in, out, fastaNames, fastqNames, lineNames));
+    return make_goss_cmd<GossCmdCountComponents>(in, out, fastaNames, fastqNames, lineNames);
 }
 
 GossCmdFactoryCountComponents::GossCmdFactoryCountComponents()

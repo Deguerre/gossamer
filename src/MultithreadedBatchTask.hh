@@ -33,11 +33,6 @@
 #define STD_CONDITION_VARIABLE
 #endif
 
-#ifndef BOOST_STATIC_ASSERT_HPP
-#include <boost/static_assert.hpp>
-#define BOOST_STATIC_ASSERT_HPP
-#endif // BOOST_STATIC_ASSERT_HPP
-
 #ifndef BOOST_EXCEPTION_PTR_HPP
 #include <boost/exception_ptr.hpp>
 #define BOOST_EXCEPTION_PTR_HPP

@@ -99,6 +99,12 @@ namespace Gossamer
         {
         }
 
+        explicit position_type(value_type::representation_type pValue)
+            : mValue(value_type(pValue))
+        {
+        }
+
+
         explicit position_type(value_param_type pValue)
             : mValue(pValue)
         {
@@ -118,8 +124,7 @@ namespace Gossamer
         {
             position_type rc(*this);
             rc.reverseComplement(pK);
-            uint64_t h0 = Hash()(*this);
-            uint64_t h1 = Hash()(rc);
+            auto [h0, h1] = value_type::hash2(this->value(), rc.value());
             return (h0 < h1) || ((h0 == h1) && (rc >= *this));
         }
 
@@ -127,8 +132,7 @@ namespace Gossamer
         {
             position_type rc(*this);
             rc.reverseComplement(pK);
-            uint64_t h0 = Hash()(*this);
-            uint64_t h1 = Hash()(rc);
+            auto [h0, h1] = value_type::hash2(this->value(), rc.value());
             if (h0 > h1)
             {
                 *this = rc;
@@ -291,6 +295,16 @@ namespace Gossamer
         {
             return position_type(~pRhs.value());
         }
+        
+        static bool testAgainstMask(param_type pLhs, param_type pMask)
+        {
+            return value_type::testAgainstMask(pLhs.value(), pMask.value());
+        }
+
+        static bool equalWithMask(param_type pLhs, param_type pRhs, param_type pMask)
+        {
+            return value_type::equalWithMask(pLhs.value(), pRhs.value(), pMask.value());
+        }
 
     private:
         value_type mValue;
@@ -314,6 +328,16 @@ namespace Gossamer
         return s;
     }
 
+
+    void sortKmers(const uint64_t k, position_type* begin, position_type* end);
+
+    template<typename Container>
+    inline void sortKmers(const uint64_t k, Container& container)
+    {
+        auto begin = &container[0];
+        auto size = container.size();
+        sortKmers(k, begin, begin + size);
+    }
 }
 
 

@@ -72,6 +72,12 @@ public:
             mHeader.count++;
         }
 
+        void push_block(const Gossamer::position_type* pBegin, const Gossamer::position_type* pEnd)
+        {
+            mKmerSetBuilder.push_block(pBegin, pEnd);
+            mHeader.count += pEnd - pBegin;
+        }
+
         void end()
         {
             mKmerSetBuilder.end(Gossamer::position_type(1) << (2 * mHeader.K));
@@ -120,7 +126,7 @@ public:
             ++mKmersItr;
         }
 
-        Iterator(const KmerSet& pKmerSet)
+        explicit Iterator(const KmerSet& pKmerSet)
             : mKmersItr(pKmerSet.mKmers.iterator())
         {
         }
@@ -128,6 +134,42 @@ public:
     private:
         SparseArray::Iterator mKmersItr;
     };
+
+    class RangeIterator
+    {
+    public:
+        bool valid() const
+        {
+            return mCurRank < mEndRank;
+        }
+
+        std::pair<Edge, uint32_t> operator*() const
+        {
+            return std::make_pair<Edge, uint32_t>(Edge(*mKmersItr), 1);
+        }
+
+        uint64_t curRank() const
+        {
+            return mCurRank;
+        }
+
+        void operator++()
+        {
+            ++mCurRank;
+            ++mKmersItr;
+        }
+
+        RangeIterator(const KmerSet& pKmerSet, uint64_t pBeginRank, uint64_t pEndRank)
+            : mKmersItr(pKmerSet.mKmers.iteratorFromRank(pBeginRank)), mCurRank(pBeginRank), mEndRank(pEndRank)
+        {
+        }
+
+    private:
+        SparseArray::Iterator mKmersItr;
+        uint64_t mCurRank, mEndRank;
+    };
+
+
 
     class LazyIterator
     {
@@ -250,6 +292,8 @@ public:
           mKmers(pBaseName + ".kmers", pFactory)
     {
     }
+
+    void prepopulate();
 
 private:
     const Header mHeader;

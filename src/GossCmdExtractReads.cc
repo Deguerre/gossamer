@@ -135,7 +135,7 @@ GossCmdFactoryExtractReads::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdExtractReads(in, fastas, fastqs, lines, out));
+    return make_goss_cmd<GossCmdExtractReads>(in, fastas, fastqs, lines, out);
 }
 
 GossCmdFactoryExtractReads::GossCmdFactoryExtractReads()

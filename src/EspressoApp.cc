@@ -111,7 +111,7 @@ namespace // anonymous
 
             chk.throwIfNecessary(pApp);
 
-            return GossCmdPtr(new EspressoCmdSingle(fas, fqs, ls, v, m, K));
+            return make_goss_cmd<EspressoCmdSingle>(fas, fqs, ls, v, m, K);
         }
 
         EspressoCmdFactorySingle()
@@ -187,7 +187,7 @@ namespace // anonymous
 
             chk.throwIfNecessary(pApp);
 
-            return GossCmdPtr(new EspressoCmdSparseSingle(g, fas, fqs, ls, v, m));
+            return make_goss_cmd<EspressoCmdSparseSingle>(g, fas, fqs, ls, v, m);
         }
 
         EspressoCmdFactorySparseSingle()
@@ -261,7 +261,7 @@ namespace // anonymous
 
             chk.throwIfNecessary(pApp);
 
-            return GossCmdPtr(new EspressoCmdMulti(fas, fqs, ls, v, m, K));
+            return make_goss_cmd<EspressoCmdMulti>(fas, fqs, ls, v, m, K);
         }
 
         EspressoCmdFactoryMulti()
@@ -355,7 +355,7 @@ namespace // anonymous
 
             chk.throwIfNecessary(pApp);
 
-            return GossCmdPtr(new EspressoCmdSparseMulti(g, fas, fqs, ls, kms, v, m));
+            return make_goss_cmd<EspressoCmdSparseMulti>(g, fas, fqs, ls, kms, v, m);
         }
 
         EspressoCmdFactorySparseMulti()
@@ -841,7 +841,7 @@ namespace // anonymous
 
             chk.throwIfNecessary(pApp);
 
-            return GossCmdPtr(new EspressoCmdDoQueries(g, ps, fas, fqs, ls, cf, ucf, T));
+            return make_goss_cmd<EspressoCmdDoQueries>(g, ps, fas, fqs, ls, cf, ucf, T);
         }
 
         EspressoCmdFactoryDoQueries()
@@ -973,7 +973,7 @@ namespace // anonymous
 
             chk.throwIfNecessary(pApp);
 
-            return GossCmdPtr(new EspressoCmdSimilarity(g, s, T));
+            return make_goss_cmd<EspressoCmdSimilarity>(g, s, T);
         }
 
         EspressoCmdFactorySimilarity()

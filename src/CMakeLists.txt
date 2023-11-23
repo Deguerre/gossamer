@@ -1,5 +1,8 @@
 
-ADD_LIBRARY(gosslib
+# XXX FIXME BEFORE DEPLOYING
+add_compile_definitions(GOSS_USE_PDEP)
+
+ADD_LIBRARY(gosslib STATIC
 	GossCmdReg.cc App.cc
 	AnnotTree.cc
 	#AsyncMerge.cc
@@ -29,6 +32,7 @@ ADD_LIBRARY(gosslib
 	Phylogeny.cc
 	PhysicalFileFactory.cc
 	Profile.cc
+	RankSelect.cc
 	RRRArray.cc
 	ScaffoldGraph.cc
 	SmallBaseVector.cc
@@ -43,20 +47,18 @@ ADD_LIBRARY(gosslib
 )
 
 TARGET_LINK_LIBRARIES(gosslib
-	${Boost_SYSTEM_LIBRARY}
-	${Boost_IOSTREAMS_LIBRARY}
-	${Boost_FILESYSTEM_LIBRARY}
-	${ZLIB_LIBRARIES}
+    Boost::system Boost::iostreams Boost::filesystem Boost::program_options
+	ZLIB::ZLIB
 	${BZIP2_LIBRARIES}
-	${SQLITE_LIBRARIES}
+	libzip::zip
 	Threads::Threads
 )
 
 
-ADD_LIBRARY(gossapp
+ADD_LIBRARY(gossapp STATIC
 	GossApp.cc GossOption.cc GossCmdHelp.cc 
 	GossCmdAnnotateKmers.cc
-	GossCmdBuildDb.cc
+	# GossCmdBuildDb.cc
 	GossCmdBuildEdgeIndex.cc
 	GossCmdBuildEntryEdgeSet.cc
 	GossCmdEstimateErrorRate.cc
@@ -94,23 +96,32 @@ ADD_LIBRARY(gossapp
 	GossCmdThreadReads.cc
 	GossCmdTrimGraph.cc
 	GossCmdTrimPaths.cc
-	#GossCmdUpgradeGraph.cc
-	${Boost_PROGRAM_OPTIONS_LIBRARY}
 )
 
 
+if (BUILDING_goss)
 # goss
 
-TARGET_LINK_LIBRARIES(gossapp gosslib ${Boost_PROGRAM_OPTIONS_LIBRARY})
+TARGET_LINK_LIBRARIES(gossapp gosslib)
 
 ADD_EXECUTABLE(goss goss.cc)
 
 TARGET_LINK_LIBRARIES(goss gossapp)
+install(TARGETS goss
+	RUNTIME DESTINATION bin)
 
+# gossple
+
+ADD_EXECUTABLE(gossple gossple.cc)
+
+TARGET_LINK_LIBRARIES(gossple Boost::filesystem)
+install(TARGETS gossple
+	RUNTIME DESTINATION bin)
+endif(BUILDING_goss)
 
 # xenome
 
-ADD_LIBRARY(xenomeapp
+ADD_LIBRARY(xenomeapp STATIC
 	XenoApp.cc GossOption.cc GossCmdReg.cc GossCmdHelp.cc 
 	GossCmdBuildKmerSet.cc
 	GossCmdMergeAndAnnotateKmerSets.cc
@@ -124,12 +135,15 @@ ADD_EXECUTABLE(xenome xenome.cc)
 
 TARGET_LINK_LIBRARIES(xenome xenomeapp)
 
+install(TARGETS xenome
+	RUNTIME DESTINATION bin)
+
 
 # translucent
 
 if(BUILD_translucent)
 
-ADD_LIBRARY(translucentapp
+ADD_LIBRARY(translucentapp STATIC
 	TranslucentApp.cc GossOption.cc GossCmdReg.cc GossCmdHelp.cc 
 	GossCmdBuildGraph.cc
 	GossCmdLintGraph.cc
@@ -148,11 +162,14 @@ ADD_EXECUTABLE(translucent translucent.cc)
 
 TARGET_LINK_LIBRARIES(translucent translucentapp)
 
+install(TARGETS translucent
+	RUNTIME DESTINATION bin)
 endif(BUILD_translucent)
 
 # electus
 
-ADD_LIBRARY(electusapp
+if (BUILD_electus)
+ADD_LIBRARY(electusapp STATIC
 	ElectApp.cc GossOption.cc GossCmdReg.cc GossCmdHelp.cc
 	GossCmdBuildKmerSet.cc
 	GossCmdFilterReads.cc
@@ -163,6 +180,9 @@ TARGET_LINK_LIBRARIES(electusapp gosslib ${Boost_PROGRAM_OPTIONS_LIBRARY})
 ADD_EXECUTABLE(electus electus.cc)
 
 TARGET_LINK_LIBRARIES(electus electusapp)
+install(TARGETS electus
+	RUNTIME DESTINATION bin)
+endif (BUILD_electus)
 
 
 # espresso
@@ -177,19 +197,9 @@ TARGET_LINK_LIBRARIES(electus electusapp)
 #    ADD_EXECUTABLE(espresso espressoapp)
 #    TARGET_LINK_LIBRARIES(espresso matio ${Boost_PROGRAM_OPTIONS_LIBRARY})
 #endif
+# install(TARGETS electus
+# 	RUNTIME DESTINATION bin)
 
-
-# gossple
-
-ADD_EXECUTABLE(gossple gossple.cc)
-
-TARGET_LINK_LIBRARIES(gossple ${Boost_LIBRARIES})
-
-
-# Install targets
-
-install(TARGETS goss xenome electus gossple
-	RUNTIME DESTINATION bin)
 
 
 # Unit tests
@@ -203,7 +213,7 @@ MACRO(gossamer_unit_test t src)
    set(extra_macro_args ${ARGN})
    list(LENGTH extra_macro_args num_extra_args)
 
-   set(extra_libs gosslib)
+   set(extra_libs gosslib Boost::timer)
 
    if (${num_extra_args} GREATER 0)
        list(GET extra_macro_args 0 lib)
@@ -244,9 +254,11 @@ gossamer_unit_test(testMultithreadedBatchTask testMultithreadedBatchTask.cc)
 gossamer_unit_test(testPlainLineSource testPlainLineSource.cc)
 gossamer_unit_test(testPhysicalFileFactory testPhysicalFileFactory.cc)
 gossamer_unit_test(testRRRArray testRRRArray.cc)
+gossamer_unit_test(testRankSelect testRankSelect.cc)
 gossamer_unit_test(testReverseComplementAdapter testReverseComplementAdapter.cc)
 gossamer_unit_test(testRunLengthCodedBitVectorWord testRunLengthCodedBitVectorWord.cc)
 gossamer_unit_test(testRunLengthCodedSet testRunLengthCodedSet.cc)
+gossamer_unit_test(testSample testSample.cc)
 gossamer_unit_test(testSimpleHashMap testSimpleHashMap.cc)
 gossamer_unit_test(testSimpleHashSet testSimpleHashSet.cc)
 gossamer_unit_test(testSimpleRangeSet testSimpleRangeSet.cc)
@@ -260,6 +272,7 @@ gossamer_unit_test(testUtils testUtils.cc)
 gossamer_unit_test(testVariableByteArray testVariableByteArray.cc)
 gossamer_unit_test(testVariableWidthBitArray testVariableWidthBitArray.cc)
 gossamer_unit_test(testWordyBitVector testWordyBitVector.cc)
+gossamer_unit_test(testWorkQueue testWorkQueue.cc)
 gossamer_unit_test(testVByteCodec testVByteCodec.cc)
 gossamer_unit_test(testGossCmdBuildGraph testGossCmdBuildGraph.cc gossapp)
 gossamer_unit_test(testGossCmdPrintContigs testGossCmdPrintContigs.cc gossapp)

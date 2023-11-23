@@ -248,7 +248,7 @@ GossCmdFactoryBuildSubgraph::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdBuildSubgraph(in, out, fastaNames, fastqNames, lineNames, radius, lp, B));
+    return make_goss_cmd<GossCmdBuildSubgraph>(in, out, fastaNames, fastqNames, lineNames, radius, lp, B);
 }
 
 GossCmdFactoryBuildSubgraph::GossCmdFactoryBuildSubgraph()

@@ -73,7 +73,7 @@ GossCmdFactoryDetectVariants::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdDetectVariants(ref, target));
+    return make_goss_cmd<GossCmdDetectVariants>(ref, target);
 }
 
 GossCmdFactoryDetectVariants::GossCmdFactoryDetectVariants()

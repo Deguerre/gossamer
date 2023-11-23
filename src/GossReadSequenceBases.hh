@@ -71,7 +71,6 @@ public:
     GossReadSequencePtr create(const GossReadParserPtr& pParserPtr,
         Logger* pLogger=0) const
     {
-        using namespace boost;
         if (pLogger)
         {
             LOG(*pLogger, info) << "parsing sequences from "

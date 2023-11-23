@@ -36,9 +36,9 @@
 #define STD_MEMORY
 #endif
 
-#ifndef BOOST_OPTIONAL_HPP
-#include <boost/optional.hpp>
-#define BOOST_OPTIONAL_HPP
+#ifndef STD_OPTIONAL
+#include <optional>
+#define STD_OPTIONAL
 #endif
 
 class GossCmd
@@ -49,6 +49,16 @@ public:
     virtual ~GossCmd() {}
 };
 typedef std::shared_ptr<GossCmd> GossCmdPtr;
+
+
+template<typename C, class... Args>
+inline GossCmdPtr
+make_goss_cmd(Args... args)
+{
+    static_assert(std::is_base_of_v<GossCmd, C>);
+    return std::static_pointer_cast<GossCmd>(std::make_shared<C>(std::forward<Args>(args)...));
+}
+
 
 class GossCmdCompound : public GossCmd
 {

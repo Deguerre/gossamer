@@ -57,7 +57,7 @@
 #endif
 
 class Graph;
-typedef boost::shared_ptr<Graph> GraphPtr;
+typedef std::shared_ptr<Graph> GraphPtr;
 
 class Graph : public GraphEssentials<Graph>
 {

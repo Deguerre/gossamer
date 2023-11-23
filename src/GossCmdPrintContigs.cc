@@ -264,7 +264,7 @@ GossCmdFactoryPrintContigs::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdPrintContigs(in, c, l, rcs, omitSequence, printLinearSegs, verb, noBrk, ent, T, out));
+    return make_goss_cmd<GossCmdPrintContigs>(in, c, l, rcs, omitSequence, printLinearSegs, verb, noBrk, ent, T, out);
 }
 
 GossCmdFactoryPrintContigs::GossCmdFactoryPrintContigs()

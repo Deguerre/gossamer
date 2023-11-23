@@ -6,14 +6,16 @@
 // you may not use this file except in compliance with the License.
 // Please see the file LICENSE, included with this distribution.
 //
-//#include "Utils.hh"
+
+#include <DbgHelp.h>
+#pragma comment(lib, "Dbghelp.lib")
 
 #include "Utils.hh"
+#include "GossamerException.hh"
 #include <bitset>
 #include <signal.h>
-#include <DbgHelp.h>
+#include <chrono>
 
-#pragma intrinsic(__popcnt64)
 #pragma intrinsic(__cpuid)
 #pragma intrinsic(__cpuidex)
 
@@ -67,9 +69,9 @@ namespace Gossamer { namespace Windows {
 
          for( i = 0; i < frames; i++ )
          {
-         SymFromAddr( process, ( DWORD64 )( stack[ i ] ), 0, symbol );
+            SymFromAddr( process, ( DWORD64 )( stack[ i ] ), 0, symbol );
 
-         printf( "%i: %s - 0x%0X\n", frames - i - 1, symbol->Name, symbol->Address );
+            printf( "%i: %s - 0x%0X\n", frames - i - 1, symbol->Name, symbol->Address );
          }
 
          free( symbol );
@@ -125,47 +127,13 @@ namespace Gossamer { namespace Windows {
         }
     }
 
-    static uint8_t sPopcntLut[256];
-
-    uint32_t popcntByLut(uint64_t pValue)
-    {
-        uint32_t ret = 0;
-        ret += sPopcntLut[pValue & 0xff]; pValue >>= 8;
-        ret += sPopcntLut[pValue & 0xff]; pValue >>= 8;
-        ret += sPopcntLut[pValue & 0xff]; pValue >>= 8;
-        ret += sPopcntLut[pValue & 0xff]; pValue >>= 8;
-        ret += sPopcntLut[pValue & 0xff]; pValue >>= 8;
-        ret += sPopcntLut[pValue & 0xff]; pValue >>= 8;
-        ret += sPopcntLut[pValue & 0xff]; pValue >>= 8;
-        ret += sPopcntLut[pValue & 0xff]; pValue >>= 8;
-        return ret;
-    }
-
-    uint32_t popcntByIntrinsic(uint64_t pValue)
-    {
-        return (uint32_t)__popcnt64(pValue);
-    }
-
-    uint32_t (*sPopcnt64)(uint64_t pWord) = &popcntByLut;
-
     void setupPopcnt()
     {
-        for (uint64_t i = 0; i < 256; ++i)
-        {
-            uint8_t ii = i;
-            uint8_t val = 0;
-            val += ii & 1; ii >>= 1;
-            val += ii & 1; ii >>= 1;
-            val += ii & 1; ii >>= 1;
-            val += ii & 1; ii >>= 1;
-            val += ii & 1; ii >>= 1;
-            val += ii & 1; ii >>= 1;
-            val += ii & 1; ii >>= 1;
-            val += ii & 1; ii >>= 1;
-            sPopcntLut[i] = val;
+        if (!sCpuCaps[kCpuCapPopcnt]) {
+            BOOST_THROW_EXCEPTION(
+                Gossamer::error()
+                << Gossamer::general_error_info("popcnt instruction not detected on this platform"));
         }
-
-        sPopcnt64 = sCpuCaps[kCpuCapPopcnt] ? &popcntByIntrinsic : &popcntByLut;
     }
 
 } }
@@ -187,18 +155,25 @@ Gossamer::logicalProcessorCount()
 }
 
 
-void gettimeofday(timeval* t, void *)
+int gettimeofday(struct timeval* tv, void* tz)
 {
-    using namespace boost::posix_time;
+    if (tv) {
+        FILETIME               filetime; /* 64-bit value representing the number of 100-nanosecond intervals since January 1, 1601 00:00 UTC */
+        ULARGE_INTEGER         x;
+        ULONGLONG              usec;
+        static const ULONGLONG epoch_offset_us = 11644473600000000ULL; /* microseconds betweeen Jan 1,1601 and Jan 1,1970 */
 
-    static const ptime timeAtEpoch( boost::gregorian::date(1970,1,1) ); 
-    
-    time_duration diff = microsec_clock::local_time() - timeAtEpoch;
-    
-    t->tv_sec = diff.total_seconds();
-    
-    diff -= seconds(t->tv_sec); // get only the fractional second part
-    t->tv_usec = diff.total_microseconds();
+#if _WIN32_WINNT >= _WIN32_WINNT_WIN8
+        GetSystemTimePreciseAsFileTime(&filetime);
+#else
+        GetSystemTimeAsFileTime(&filetime);
+#endif
+        x.LowPart = filetime.dwLowDateTime;
+        x.HighPart = filetime.dwHighDateTime;
+        usec = x.QuadPart / 10 - epoch_offset_us;
+        tv->tv_sec = (time_t)(usec / 1000000ULL);
+        tv->tv_usec = (long)(usec % 1000000ULL);
+    }
+    return 0;
 }
-
 

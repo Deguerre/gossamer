@@ -45,10 +45,9 @@ private:
 
 std::shared_ptr<GossKillSignal> GossKillSignal::mInstance;
 
-using namespace std;
-using namespace boost;
 
-GossKillSignal::GossKillSignal(const string& pSignalFile, int pCheckEveryMsec)
+inline
+GossKillSignal::GossKillSignal(const std::string& pSignalFile, int pCheckEveryMsec)
     : mSignalFile( pSignalFile )
     , mCheckEveryMsec( pCheckEveryMsec )
     , mStop( false )
@@ -57,31 +56,35 @@ GossKillSignal::GossKillSignal(const string& pSignalFile, int pCheckEveryMsec)
 }
 
 
+inline
 GossKillSignal::~GossKillSignal()
 {
     // nothing yet
 }
 
+inline
 void GossKillSignal ::operator()()
 {
     while( !mStop )
     {
         step();
     }
-    cerr << "GossKillSignal thread finished" << endl;
+    std::cerr << "GossKillSignal thread finished\n";
 }
 
+inline
 void GossKillSignal::step()
 {
-    this_thread::sleep( posix_time::milliseconds( mCheckEveryMsec ) );
+    std::this_thread::sleep_for(std::chrono::milliseconds( mCheckEveryMsec ));
     //fprintf( stderr, "Checking for kill signal file" );
 
-    if( filesystem::exists(mSignalFile) )
+    if( boost::filesystem::exists(mSignalFile) )
     {
         exit(1);
     }
 }
 
+inline
 void GossKillSignal::JoinThread()
 {
     if( mInstance != 0 )
@@ -91,13 +94,15 @@ void GossKillSignal::JoinThread()
     }
 }
 
+inline
 void GossKillSignal::Register(const std::string& pSignalFileName, int pCheckEveryMsec )
 {
-    cerr << "Here" << endl;
+    std::cerr << "Here" << std::endl;
     mInstance = std::make_shared<GossKillSignal>(pSignalFileName, pCheckEveryMsec);
-    mInstance->mThread = std::make_shared<thread>( boost::ref(*GossKillSignal::mInstance) ); // start the thread that checks for signals
+    mInstance->mThread = std::make_shared<std::thread>( std::ref(*GossKillSignal::mInstance) ); // start the thread that checks for signals
 }
 
+inline
 bool GossKillSignal::ParseAndRegister(int& argc, char* argv[], bool bRemoveFromArgs, int pCheckEveryMsec)
 {
     for( int i = 1; i < argc; ++i )
@@ -106,7 +111,7 @@ bool GossKillSignal::ParseAndRegister(int& argc, char* argv[], bool bRemoveFromA
         {
             if( i + 1 >= argc )
             {
-                cerr << "Invalid argument for: " << KILL_SIGNAL_CMD_OPTION << endl;
+                std::cerr << "Invalid argument for: " << KILL_SIGNAL_CMD_OPTION << '\n';
                 return false;
             }
 

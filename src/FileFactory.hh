@@ -33,16 +33,6 @@
 #define STD_MEMORY
 #endif
 
-//#ifndef BOOST_UUID_HPP
-//#include <boost/uuid/uuid.hpp>
-//#define BOOST_UUID_HPP
-//#endif
-//
-//#ifndef BOOST_UUID_GENERATORS_HPP
-//#include <boost/uuid/uuid_generators.hpp>
-//#define BOOST_UUID_GENERATORS_HPP
-//#endif
-
 #ifndef BOOST_LEXICAL_CAST_HPP
 #include <boost/lexical_cast.hpp>
 #define BOOST_LEXICAL_CAST_HPP

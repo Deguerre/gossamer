@@ -6,7 +6,14 @@
 // you may not use this file except in compliance with the License.
 // Please see the file LICENSE, included with this distribution.
 //
-#include "Utils.hh"
+
+/* Workaround for this known problem on Windows:
+   https://developercommunity.visualstudio.com/t/error-c2872-byte-ambiguous-symbol/93889
+*/
+#define _HAS_STD_BYTE 0
+#define WIN32_LEAN_AND_MEAN
+
+#include "MachDepPlatform.hh"
 
 #if defined(GOSS_LINUX_X64)
 #include "MachDepLinux.cc"
@@ -17,5 +24,3 @@
 #else
 #error "Something went wrong with the machine-dependent port"
 #endif
-
-

@@ -76,7 +76,7 @@ GossCmdFactoryBuildEdgeIndex::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdBuildEdgeIndex(in, T, cr));
+    return make_goss_cmd<GossCmdBuildEdgeIndex>(in, T, cr);
 }
 
 GossCmdFactoryBuildEdgeIndex::GossCmdFactoryBuildEdgeIndex()

@@ -98,29 +98,29 @@ GossCmdFactoryPopBubbles::create(App& pApp, const variables_map& pOpts)
     FileFactory& fac(pApp.fileFactory());
     chk.getMandatory("graph-out", out, GossOptionChecker::FileCreateCheck(fac, true));
 
-    optional<uint64_t> numThreads;
+    std::optional<uint64_t> numThreads;
     chk.getOptional("num-threads", numThreads);
 
-    optional<uint64_t> cutoff;
+    std::optional<uint64_t> cutoff;
     chk.getOptional("cutoff", cutoff);
 
-    optional<double> relCutoff;
+    std::optional<double> relCutoff;
     chk.getOptional("relative-cutoff", relCutoff);
 
-    optional<uint64_t> maxSequenceLength;
+    std::optional<uint64_t> maxSequenceLength;
     chk.getOptional("max-sequence-length", maxSequenceLength);
 
-    optional<uint64_t> maxEditDistance;
+    std::optional<uint64_t> maxEditDistance;
     chk.getOptional("max-edit-distance", maxEditDistance);
 
-    optional<double> maxErrorRate;
+    std::optional<double> maxErrorRate;
     chk.getOptional("max-error-rate", maxErrorRate);
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdPopBubbles(in, out, numThreads,
+    return make_goss_cmd<GossCmdPopBubbles>(in, out, numThreads,
             maxSequenceLength, maxEditDistance, maxErrorRate,
-            cutoff, relCutoff));
+            cutoff, relCutoff);
 }
 
 

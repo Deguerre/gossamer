@@ -514,9 +514,9 @@ GossCmdFactoryBuildScaffold::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdBuildScaffold(in, fastas, fastqs, lines,
+    return make_goss_cmd<GossCmdBuildScaffold>(in, fastas, fastqs, lines,
             inferCoverage, expectedCoverage, expectedSize, stdDevFactor,
-            tolerance, o, T, cr, estimateOnly));
+            tolerance, o, T, cr, estimateOnly);
 }
 
 GossCmdFactoryBuildScaffold::GossCmdFactoryBuildScaffold()

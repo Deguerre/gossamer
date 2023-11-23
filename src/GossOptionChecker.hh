@@ -203,7 +203,7 @@ public:
     }
 
     template <typename T>
-    bool getOptional(const std::string& pName, boost::optional<T>& pVal)
+    bool getOptional(const std::string& pName, std::optional<T>& pVal)
     {
         if (mOpts.count(pName) == 0)
         {

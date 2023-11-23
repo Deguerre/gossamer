@@ -50,6 +50,7 @@ public:
 
     static const uint64_t one = 1;
     static const uint64_t wordBits = 64;
+    static const uint64_t bufferSize = 4096;
 
     class Builder
     {
@@ -59,16 +60,12 @@ public:
         {
             BOOST_ASSERT(mCurrPos <= pPos);
 
-            uint64_t destWordNum = pPos / wordBits;
-            if (mCurrWordNum < destWordNum)
-            {
+            while  (mCurrPos + bufferSize - mBufferCount <= pPos) {
+                mCurrPos += bufferSize - mBufferCount;
+                mBufferCount = bufferSize;
                 flush();
-
-                // The next call to flush() will automatically fill in any
-                // intervening zero words.
-                mCurrWordNum = destWordNum;
-                mCurrWord = 0;
             }
+            mBufferCount += pPos - mCurrPos;
             mCurrPos = pPos;
         }
 
@@ -89,22 +86,11 @@ public:
 
         void push_backX(bool pBit)
         {
-            uint64_t w = mCurrPos / wordBits;
-            uint64_t b = mCurrPos % wordBits;
-
-            if (w != mCurrWordNum)
-            {
-                flush();
-                mCurrWordNum = w;
-                mCurrWord = 0;
-            }
-
-            if (pBit)
-            {
-                mCurrWord |= one << b;
-            }
-
+            mBuffer[mBufferCount++] = pBit;
             ++mCurrPos;
+            if (mBufferCount >= bufferSize) {
+                flush();
+            }
         }
 
 
@@ -114,7 +100,6 @@ public:
         {
             flush();
         }
-
 
         // Constructor
         //
@@ -131,6 +116,8 @@ public:
         uint64_t mFileWordNum;
         uint64_t mCurrWordNum;
         uint64_t mCurrWord;
+        uint64_t mBufferCount;
+        uint8_t mBuffer[bufferSize];
     };
 
     template <typename Itr>
@@ -151,6 +138,15 @@ public:
         {
             next();
             seek1();
+        }
+
+        void setPosition(uint64_t pos)
+        {
+            uint64_t w = pos / wordBits;
+            uint64_t b = pos % wordBits;
+            mCurrWord = mWordItr.setPosition(w) & ((~(uint64_t)0) << b);
+            mCurrWordNum = w;
+            mCurrBitPos = b;
         }
 
         GeneralIterator(const Itr& pItr)
@@ -268,6 +264,10 @@ public:
         t.putProp("storage", words() * sizeof(uint64_t));
         return t;
     }
+
+    // Prepopulate the vector in virtual memory
+    //
+    void prepopulate() const;
 
     // Constructor
     //

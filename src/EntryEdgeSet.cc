@@ -13,7 +13,6 @@
 #include "ProgressMonitor.hh"
 #include "WorkQueue.hh"
 
-#include <boost/lambda/bind.hpp>
 #include <boost/lexical_cast.hpp>
 #include <memory>
 #include <boost/math/special_functions/round.hpp>

@@ -33,7 +33,7 @@
 #include "VByteCodec.hh"
 
 #include <iostream>
-#include <boost/unordered_map.hpp>
+#include <unordered_map>
 #include <boost/dynamic_bitset.hpp>
 
 using namespace boost;
@@ -80,7 +80,7 @@ GossCmdFactoryBuildEntryEdgeSet::create(App& pApp, const boost::program_options:
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdBuildEntryEdgeSet(in, t));
+    return make_goss_cmd<GossCmdBuildEntryEdgeSet>(in, t);
 }
 
 GossCmdFactoryBuildEntryEdgeSet::GossCmdFactoryBuildEntryEdgeSet()

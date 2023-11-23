@@ -418,7 +418,7 @@ GossCmdFactoryAnnotateKmers::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdAnnotateKmers(ref, annot, merge, T));
+    return make_goss_cmd<GossCmdAnnotateKmers>(ref, annot, merge, T);
 }
 
 GossCmdFactoryAnnotateKmers::GossCmdFactoryAnnotateKmers()

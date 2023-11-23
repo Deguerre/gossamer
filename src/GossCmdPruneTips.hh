@@ -19,8 +19,8 @@ public:
     void operator()(const GossCmdContext& pCxt);
 
     GossCmdPruneTips(const std::string& pIn, const std::string& pOut,
-                     boost::optional<uint64_t> pCutoff,
-                     boost::optional<double> pRelCutoff,
+                     std::optional<uint64_t> pCutoff,
+                     std::optional<double> pRelCutoff,
                      const uint64_t& pThreads, const uint64_t& pIterations)
         : mIn(pIn), mOut(pOut), mCutoff(pCutoff), mRelCutoff(pRelCutoff),
           mThreads(pThreads), mIterations(pIterations)
@@ -30,8 +30,8 @@ public:
 private:
     const std::string mIn;
     const std::string mOut;
-    const boost::optional<uint64_t> mCutoff;
-    const boost::optional<double> mRelCutoff;
+    const std::optional<uint64_t> mCutoff;
+    const std::optional<double> mRelCutoff;
     const uint64_t mThreads;
     const uint64_t mIterations;
 };

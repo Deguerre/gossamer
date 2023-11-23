@@ -129,7 +129,7 @@ TransCmdFactoryMergeGraphWithReference::create(App& pApp, const variables_map& p
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new TransCmdMergeGraphWithReference(ref, in, out));
+    return make_goss_cmd<TransCmdMergeGraphWithReference>(ref, in, out);
 }
 
 TransCmdFactoryMergeGraphWithReference::TransCmdFactoryMergeGraphWithReference()

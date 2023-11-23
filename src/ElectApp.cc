@@ -133,7 +133,7 @@ namespace // anonymous
 
             chk.throwIfNecessary(pApp);
 
-            return GossCmdPtr(new ElectCmdIndex(refs, out, K, M, T));
+            return make_goss_cmd<ElectCmdIndex>(refs, out, K, M, T);
         }
 
         ElectCmdFactoryIndex()
@@ -753,8 +753,8 @@ namespace // anonymous
 
             chk.throwIfNecessary(pApp);
 
-            return GossCmdPtr(new ElectCmdGroup(K, refThresh, fastaRefs, indexRefs, fastas, fastqs, lines, pairs, maxMem, T, 
-                                                match, nonmatch, ord, singleSeqRefs));
+            return make_goss_cmd<ElectCmdGroup>(K, refThresh, fastaRefs, indexRefs, fastas, fastqs, lines, pairs, maxMem, T, 
+                                                match, nonmatch, ord, singleSeqRefs);
         }
 
         ElectCmdFactoryGroup()

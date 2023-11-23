@@ -9,12 +9,6 @@
 #ifndef SPINLOCK_HH
 #define SPINLOCK_HH
 
-// Spinlocks are hard to port.  Here's the general strategy:
-//     - On Mac OSX, the OS provides them.
-//     - On Linux, use GCC test and set where possible.
-//     - On Windows, the OS only supports spinlocks in the DDK.
-//       So use Interlocked*Exchange.
-//
 // On Intel ISA (i.e. everything so far), we try to use the pause
 // instruction in spin loops. This gives a hint to the CPU that it
 // shouldn't saturate the bus with cache acquire requests until some
@@ -26,99 +20,58 @@
 // since it's the same as rep ; nop.
 
 
-// OS X spinlocks changed in 10.12 Sierra.
-#if defined(GOSS_MACOSX_X64) && defined(OSSPINLOCK_DEPRECATED)
-#  include <os/lock.h>
-#endif
-
-
-
 class Spinlock
 {
 private:
-
-#if defined(GOSS_MACOSX_X64)
-#  if defined(OSSPINLOCK_DEPRECATED)
-    os_unfair_lock mLock;
-#  else
-    OSSpinLock mLock;
-#  endif
-#elif defined(GOSS_WINDOWS_X64)
-    int64_t mLock;
-#else
-    volatile uint64_t mLock;
-#endif
+    std::atomic<uint64_t> mLatch = 0;
 
 public:
     void lock()
     {
-#if defined(GOSS_MACOSX_X64)
-#  if defined(OSSPINLOCK_DEPRECATED)
-        os_unfair_lock_lock(&mLock);
-#  else
-        OSSpinLockLock(&mLock);
-#  endif
-#elif defined(GOSS_WINDOWS_X64)
-        while (_InterlockedCompareExchange64(&mLock, 1, 0) != 0)
-        {
-            YieldProcessor;
+        for (;;) {
+            if (!mLatch.exchange(true, std::memory_order_acquire)) {
+                break;
+            }
+            while (mLatch.load(std::memory_order_relaxed)) {
+                Gossamer::cpu_relax();
+            }
         }
-#else
-        while (__sync_lock_test_and_set(&mLock, 1))
-        {
-            do
-            {
-                _mm_pause();
-            } while (mLock);
-        }
-#endif
     }
 
     void unlock()
     {
-#if defined(GOSS_MACOSX_X64)
-#  if defined(OSSPINLOCK_DEPRECATED)
-        os_unfair_lock_unlock(&mLock);
-#  else
-        OSSpinLockUnlock(&mLock);
-#  endif
-#elif defined(GOSS_WINDOWS_X64)
-        _InterlockedExchange64(&mLock, 0);
-#else
-        __sync_lock_release(&mLock);
-#endif
+        mLatch.store(0, std::memory_order_release);
     }
 
     Spinlock()
     {
-#ifdef GOSS_MACOSX_X64
-#  if defined(OSSPINLOCK_DEPRECATED)
-        mLock = OS_UNFAIR_LOCK_INIT;
-#  else
-        mLock = OS_SPINLOCK_INIT;
-#  endif
-#else
-        mLock = 0;
-#endif
     }
 };
 
 class SpinlockHolder
 {
+    Spinlock& mLock;
+    bool mHeld = false;
+
 public:
     SpinlockHolder(Spinlock& pLock)
         : mLock(pLock)
     {
         mLock.lock();
+        mHeld = true;
+    }
+
+    void unlock()
+    {
+        mLock.unlock();
+        mHeld = false;
     }
 
     ~SpinlockHolder()
     {
-        mLock.unlock();
+        if (mHeld) mLock.unlock();
+        mHeld = false;
     }
-
-private:
-    Spinlock& mLock;
 };
 
 #endif // SPINLOCK_HH

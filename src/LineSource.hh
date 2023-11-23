@@ -14,9 +14,9 @@
 #define STD_STRING
 #endif
 
-#ifndef BOOST_MAKE_SHARED_HPP
-#include <boost/make_shared.hpp>
-#define BOOST_MAKE_SHARED_HPP
+#ifndef STD_MEMORY
+#include <memory>
+#define STD_MEMORY
 #endif
 
 #ifndef BOOST_UTILITY_HPP
@@ -76,7 +76,7 @@ public:
 };
 
 
-typedef boost::shared_ptr<LineSource> LineSourcePtr;
+typedef std::shared_ptr<LineSource> LineSourcePtr;
 
 class PlainLineSource : public LineSource
 {
@@ -92,7 +92,7 @@ public:
     static LineSourcePtr
     create(const FileThunkIn& pIn)
     {
-        return boost::make_shared<PlainLineSource>(pIn);
+        return std::make_shared<PlainLineSource>(pIn);
     }
 
 private:
@@ -116,7 +116,7 @@ public:
     static LineSourcePtr
     create(const FileThunkIn& pIn)
     {
-        return boost::make_shared<BackgroundLineSource>(pIn);
+        return std::make_shared<BackgroundLineSource>(pIn);
     }
 
 private:

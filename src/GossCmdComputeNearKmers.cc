@@ -18,11 +18,11 @@
 #include "ProgressMonitor.hh"
 #include "RunLengthCodedSet.hh"
 #include "Spinlock.hh"
+#include "WorkQueue.hh"
 #include "Timer.hh"
-#include "ThreadGroup.hh"
 
 #include <string>
-#include <boost/atomic.hpp>
+#include <atomic>
 #include <boost/lexical_cast.hpp>
 #include <thread>
 
@@ -30,122 +30,10 @@ using namespace boost;
 using namespace boost::program_options;
 using namespace std;
 
-namespace // anonymous
-{
-    class ProgressUpdater
-    {
-    public:
-        void operator()()
-        {
-            mLog(info, lexical_cast<string>(mNumGray) + " gray kmers out of " + lexical_cast<string>(mAll));
-            double d = mNumGray;
-            d /= (mAll + 1);
-            uint64_t p = 1000 *d;
-            mLog(info, "or " + lexical_cast<string>(p / 10.0) + "%");
-        }
 
-        ProgressUpdater(Logger& pLog, uint64_t& pNumGray, uint64_t& pAll)
-            : mLog(pLog), mNumGray(pNumGray), mAll(pAll)
-        {
-        }
-
-    private:
-        Logger& mLog;
-        uint64_t& mNumGray;
-        uint64_t& mAll;
-    };
-
-    class BlockWorker
-    {
-    public:
-        void operator()()
-        {
-            for (uint64_t i = mBegin; i < mEnd; ++i, ++mGlobalCount)
-            {
-                if (!(i & mTickMask))
-                {
-                    unique_lock<mutex> lk(mMutex);
-                    mCond.notify_one();
-                }
-                if (mLhs.get(i) == mRhs.get(i))
-                {
-                    continue;
-                }
-                KmerSet::Edge x = mKmerSet.select(i);
-                bool found = false;
-                for (uint64_t j = 0; !found && j < mKmerSet.K(); ++j)
-                {
-                    for (uint64_t b = 0; !found && b < 4; ++b)
-                    {
-                        Gossamer::position_type m(b);
-                        m <<= j;
-                        KmerSet::Edge y = x;
-                        y.value() ^= m;
-    #if 0
-                        {
-                            SmallBaseVector xSeq;
-                            mKmerSet.seq(x, xSeq);
-                            SmallBaseVector ySeq;
-                            mKmerSet.seq(y, ySeq);
-                            cerr << xSeq << '\t' << ySeq << endl;
-                        }
-    #endif
-                        if (y != x)
-                        {
-                            mKmerSet.normalize(y);
-                            uint64_t r = 0;
-                            if (mKmerSet.accessAndRank(y, r))
-                            {
-                                if (mLhs.get(r) != mRhs.get(r) && mLhs.get(i) != mLhs.get(r))
-                                {
-                                    found = true;
-                                }
-                            }
-                        }
-                    }
-                }
-                bool lhsBit = mLhs.get(i);
-                bool rhsBit = mRhs.get(i);
-                if (found)
-                {
-                    ++mGrayCount;
-                    lhsBit = rhsBit = false;
-                }
-                unique_lock<mutex> lk(mMutex);
-                mNewLhs[i] = lhsBit;
-                mNewRhs[i] = rhsBit;
-            }
-            unique_lock<mutex> lk(mMutex);
-            mCond.notify_one();
-        }
-
-        BlockWorker(const KmerSet& pKmerSet, const WordyBitVector& pLhs, const WordyBitVector& pRhs,
-                    const uint64_t& pBegin, const uint64_t& pEnd,
-                    mutex& pMutex, condition_variable& pCond, dynamic_bitset<>& pNewLhs, dynamic_bitset<>& pNewRhs,
-                    boost::atomic<uint64_t>& pGlobalCount, boost::atomic<uint64_t>& pGrayCount, uint64_t& pTickMask)
-            : mKmerSet(pKmerSet), mLhs(pLhs), mRhs(pRhs), mBegin(pBegin), mEnd(pEnd),
-              mMutex(pMutex), mCond(pCond), mNewLhs(pNewLhs), mNewRhs(pNewRhs),
-              mGlobalCount(pGlobalCount), mGrayCount(pGrayCount), mTickMask(pTickMask)
-        {
-        }
-
-    private:
-        const KmerSet& mKmerSet;
-        const WordyBitVector& mLhs;
-        const WordyBitVector& mRhs;
-        const uint64_t mBegin;
-        const uint64_t mEnd;
-        mutex& mMutex;
-        condition_variable& mCond;
-        dynamic_bitset<>& mNewLhs;
-        dynamic_bitset<>& mNewRhs;
-        boost::atomic<uint64_t>& mGlobalCount;
-        boost::atomic<uint64_t>& mGrayCount;
-        const uint64_t mTickMask;
-    };
-    typedef std::shared_ptr<BlockWorker> BlockWorkerPtr;
-}
-// namespace anonymous
+// Usually no need to synchronise the lb and rb bit vectors, because different
+// threads never access the same underlying word.
+#undef SYNCHRONISE_BIT_VECTORS
 
 void
 GossCmdComputeNearKmers::operator()(const GossCmdContext& pCxt)
@@ -160,8 +48,8 @@ GossCmdComputeNearKmers::operator()(const GossCmdContext& pCxt)
     dynamic_bitset<> lb(s.count());
     dynamic_bitset<> rb(s.count());
 
-    boost::atomic<uint64_t> global(0);
-    boost::atomic<uint64_t> gray(0);
+    std::atomic<uint64_t> global(0);
+    std::atomic<uint64_t> gray(0);
     {
         WordyBitVector lhs(mIn + ".lhs-bits", fac);
         WordyBitVector rhs(mIn + ".rhs-bits", fac);
@@ -175,41 +63,102 @@ GossCmdComputeNearKmers::operator()(const GossCmdContext& pCxt)
         }
 
         log(info, "calculating grey set");
-        ProgressMonitorNew pm(log, s.count());
-        //ProgressUpdater u(log, grayCount, totalCount);
-        vector<BlockWorkerPtr> workers;
-        uint64_t d = s.count() / mNumThreads;
-        mutex mut;
-        condition_variable cond;
-        uint64_t m = (1ULL << 20) - 1;
-        for (uint64_t i = 0; i < mNumThreads; ++i)
+        WorkQueue wq(mNumThreads);
+
+        struct BlockWorkerJob
         {
-            uint64_t b = i * d;
-            uint64_t e = (i + 1) * d;
-            if (i == mNumThreads - 1)
+            BlockWorkerJob(const uint64_t& pBegin, const uint64_t& pEnd)
+                : mBegin(pBegin), mEnd(pEnd)
             {
-                e = s.count();
             }
-            workers.push_back(BlockWorkerPtr(new BlockWorker(s, lhs, rhs, b, e, mut, cond, lb, rb, global, gray, m)));
+
+            const uint64_t mBegin;
+            const uint64_t mEnd;
+            std::promise<void> mComplete;
+        };
+
+        deque<BlockWorkerJob> jobs;
+        const uint64_t d = Gossamer::align_up((uint64_t(1) << 21) * mNumThreads, 10);
+        ProgressMonitorFixed pm(log, s.count(), d);
+#ifdef SYNCHRONISE_BIT_VECTORS
+        Spinlock lbLock, rbLock;
+#endif
+        for (uint64_t i = 0, b = 0; b < s.count(); ++i, b += d)
+        {
+            uint64_t e = std::min<uint64_t>(b + d, s.count());
+            jobs.emplace_back(b, e);
         }
 
-        ThreadGroup grp;
-        for (uint64_t i = 0; i < workers.size(); ++i)
+        std::vector<Gossamer::position_type> nucleotides;
+        nucleotides.reserve(s.K() * 4);
         {
-            grp.create(*workers[i]);
-        }
-        {
-            unique_lock<mutex> lk(mut);
-            while (global < s.count())
+            for (uint64_t j = 0; j < s.K(); ++j)
             {
-                cond.wait(lk);
-                mut.unlock();
-                double q = global * 100;
-                q /= s.count();
-                mut.lock();
+                for (uint64_t b = 0; b < 4; ++b) {
+                    Gossamer::position_type m(b);
+                    m <<= j*2;
+                    nucleotides.push_back(m);
+                }
             }
         }
-        grp.join();
+
+		for (auto& job : jobs) {
+            wq.push_back([&] {
+                KmerSet::RangeIterator it(s, job.mBegin, job.mEnd);
+                for (uint64_t i = job.mBegin; i < job.mEnd; ++i, ++global, ++it)
+                {
+                    if (lhs.get(i) == rhs.get(i))
+                    {
+                        continue;
+                    }
+                    BOOST_ASSERT(it.curRank() == i);
+                    auto [x, count] = *it;
+                    bool found = false;
+                    for (auto& nt : nucleotides) {
+                        KmerSet::Edge y = x;
+                        y.value() ^= nt;
+                        if (x == y) {
+                            continue;
+                        }
+                        s.normalize(y);
+                        uint64_t r = 0;
+                        if (s.accessAndRank(y, r) && lhs.get(r) != rhs.get(r) && lhs.get(i) != lhs.get(r))
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    bool lhsBit = lhs.get(i);
+                    bool rhsBit = lhs.get(i);
+                    if (found)
+                    {
+                        ++gray;
+                        lhsBit = rhsBit = false;
+                    }
+                    {
+#ifdef SYNCHRONISE_BIT_VECTORS
+                        SpinlockHolder lk(lbLock);
+#endif
+                        lb[i] = lhsBit;
+                    }
+                    {
+#ifdef SYNCHRONISE_BIT_VECTORS
+                        SpinlockHolder lk(rbLock);
+#endif
+                        rb[i] = rhsBit;
+                    }
+                }
+                job.mComplete.set_value();
+            });
+	    }
+        for (auto& job: jobs) {
+            auto future = job.mComplete.get_future();
+            if (!Gossamer::future_is_ready(future)) {
+                pm.tick(global);
+            }
+            future.wait();
+        }
+        pm.end();
     }
 
     log(info, "found " + lexical_cast<string>(gray) + " gray bits (out of " + lexical_cast<string>(s.count()) + ").");
@@ -239,7 +188,7 @@ GossCmdFactoryComputeNearKmers::create(App& pApp, const variables_map& pOpts)
     chk.getOptional("num-threads", t);
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdComputeNearKmers(in, t));
+    return make_goss_cmd<GossCmdComputeNearKmers>(in, t);
 }
 
 GossCmdFactoryComputeNearKmers::GossCmdFactoryComputeNearKmers()

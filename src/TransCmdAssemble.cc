@@ -1827,7 +1827,7 @@ TransCmdFactoryAssemble::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new TransCmdAssemble(in, minCoverage, minConnectivityRatio, minSeedCoverage, minSeedEntropy, l, numThreads, fastas, fastqs, lines, out));
+    return make_goss_cmd<TransCmdAssemble>(in, minCoverage, minConnectivityRatio, minSeedCoverage, minSeedEntropy, l, numThreads, fastas, fastqs, lines, out);
 }
 
 

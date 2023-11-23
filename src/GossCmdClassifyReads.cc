@@ -542,7 +542,7 @@ GossCmdFactoryClassifyReads::create(App& pApp, const boost::program_options::var
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdClassifyReads(in, fastas, fastqs, lines, b, T, p));
+    return make_goss_cmd<GossCmdClassifyReads>(in, fastas, fastqs, lines, b, T, p);
 }
 
 GossCmdFactoryClassifyReads::GossCmdFactoryClassifyReads()

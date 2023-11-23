@@ -41,74 +41,6 @@ using namespace std;
 
 typedef vector<string> strings;
 
-namespace // anonymous
-{
-    class PauseButton
-    {
-    public:
-        void checkPoint()
-        {
-            unique_lock<mutex> lk(mMutex);
-            if (mPause)
-            {
-                --mArrived;
-                if (mArrived == 0)
-                {
-                    mAllPausedCond.notify_one();
-                }
-                mPauseCond.wait(lk);
-            }
-        }
-
-        void pause(uint64_t pHowMany)
-        {
-            unique_lock<mutex> lk(mMutex);
-            mPause = true;
-            mArrived = pHowMany;
-            mAllPausedCond.wait(lk);
-        }
-
-        void resume()
-        {
-            unique_lock<mutex> lk(mMutex);
-            mPause = false;
-            mPauseCond.notify_all();
-        }
-
-        PauseButton()
-            : mPause(false), mArrived(0)
-        {
-        }
-    private:
-        mutex mMutex;
-        condition_variable mPauseCond;
-        condition_variable mAllPausedCond;
-        bool mPause;
-        uint64_t mArrived;
-    };
-
-    class Pause
-    {
-    public:
-        Pause(PauseButton& pButton, uint64_t pHowMany)
-            : mButton(pButton)
-        {
-            mButton.pause(pHowMany);
-        }
-
-        ~Pause()
-        {
-            mButton.resume();
-        }
-
-    private:
-        PauseButton& mButton;
-    };
-
-} // namespace anonymous
-
-
-
 void
 GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt)
 {
@@ -160,10 +92,12 @@ GossCmdFactoryBuildKmerSet::create(App& pApp, const variables_map& pOpts)
     uint64_t B = 2;
     chk.getOptional("buffer-size", B);
 
+#ifdef GOSS_BUILD_KMER_SET_WITH_BACKYARD_HASH
     uint64_t S = BackyardHash::maxSlotBits(B << 30);
     chk.getOptional("log-hash-slots", S);
-
-    uint64_t N = (B << 30) / (1.5 * sizeof(uint32_t) + sizeof(BackyardHash::value_type));
+#else
+    uint64_t S = 0;
+#endif
 
     uint64_t T = 4;
     chk.getOptional("num-threads", T);
@@ -194,7 +128,7 @@ GossCmdFactoryBuildKmerSet::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdBuildKmerSet(K, S, N, T, graphName, fastaNames, fastqNames, lineNames));
+    return make_goss_cmd<GossCmdBuildKmerSet>(K, S, B, T, graphName, fastaNames, fastqNames, lineNames);
 }
 
 GossCmdFactoryBuildKmerSet::GossCmdFactoryBuildKmerSet()
@@ -208,8 +142,10 @@ GossCmdFactoryBuildKmerSet::GossCmdFactoryBuildKmerSet()
     mCommonOptions.insert("fastq-in");
     mCommonOptions.insert("fastqs-in");
     mCommonOptions.insert("line-in");
-    mCommonOptions.insert("log-hash-slots");
 
+#ifdef GOSS_BUILD_KMER_SET_WITH_BACKYARD_HASH
+    mCommonOptions.insert("log-hash-slots");
     mSpecificOptions.addOpt<uint64_t>("log-hash-slots", "S",
             "log2 of the number of hash slots to use (default 24)");
+#endif
 }

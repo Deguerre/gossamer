@@ -78,7 +78,7 @@ GossCmdFactoryEstimateErrorRate::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdEstimateErrorRate(ref));
+    return make_goss_cmd<GossCmdEstimateErrorRate>(ref);
 }
 
 GossCmdFactoryEstimateErrorRate::GossCmdFactoryEstimateErrorRate()

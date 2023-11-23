@@ -251,7 +251,7 @@ GossCmdFactoryExtractCoreGenome::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdExtractCoreGenome(srcs, dest));
+    return make_goss_cmd<GossCmdExtractCoreGenome>(srcs, dest);
 }
 
 GossCmdFactoryExtractCoreGenome::GossCmdFactoryExtractCoreGenome()

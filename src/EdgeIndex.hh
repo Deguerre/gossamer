@@ -17,9 +17,9 @@
 #include "SuperGraph.hh"
 #endif
 
-#ifndef BOOST_UNORDERED_MAP_HPP
-#include <boost/unordered_map.hpp>
-#define BOOST_UNORDERED_MAP_HPP
+#ifndef STD_UNORDERED_MAP
+#include <unordered_map>
+#define STD_UNORDERED_MAP
 #endif
 
 class EdgeIndex

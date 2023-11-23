@@ -1247,9 +1247,9 @@ GossCmdFactoryThreadPairs::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdThreadPairs(in, fastas, fastqs, lines, c,
+    return make_goss_cmd<GossCmdThreadPairs>(in, fastas, fastqs, lines, c,
             inferCoverage, expectedCoverage, expectedSize, stdDevFactor,
-            tolerance, o, T, cr, rad, estimateOnly, consPaths, fillGaps, maxGap, del));
+            tolerance, o, T, cr, rad, estimateOnly, consPaths, fillGaps, maxGap, del);
 }
 
 GossCmdFactoryThreadPairs::GossCmdFactoryThreadPairs()

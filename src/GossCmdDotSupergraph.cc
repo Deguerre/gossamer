@@ -140,7 +140,7 @@ GossCmdFactoryDotSupergraph::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdDotSupergraph(in, out, style));
+    return make_goss_cmd<GossCmdDotSupergraph>(in, out, style);
 }
 
 GossCmdFactoryDotSupergraph::GossCmdFactoryDotSupergraph()

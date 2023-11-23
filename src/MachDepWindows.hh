@@ -9,9 +9,11 @@
 #ifndef MACHDEPWINDOWS_HH
 #define MACHDEPWINDOWS_HH
 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <intrin.h>
-#include <boost/date_time/local_time/local_time.hpp>
+#include <immintrin.h>
+#include <winsock.h> /* for timeval */
 #include <boost/math/constants/constants.hpp>
 
 // Windows stupidly defines max and min, which interferes with cstdlib.
@@ -28,26 +30,15 @@
 #pragma intrinsic(_InterlockedIncrement64)
 #pragma intrinsic(_InterlockedExchange64)
 #pragma intrinsic(_ReadWriteBarrier)
-
-namespace Gossamer { namespace Windows {
-    extern uint32_t (*sPopcnt64)(uint64_t pWord);
-} }
+#pragma intrinsic(__popcnt64)
+#pragma intrinsic(_pdep_u64)
+#pragma intrinsic(log2)
 
 // Emulated gettimeofday().
-extern void gettimeofday(timeval* t, void *);
-
-// emulate gettimeofday()
-void gettimeofday(timeval* t, void *);
+extern int gettimeofday(struct timeval* t, void *);
 
 // emulate log2
 //const double LN_OF_2 = 0.693147180559945309417;
-
-
-inline double log2(double x)
-{
-    //return std::log(x)/LN_OF_2; // ln(x)/ln(2)
-    return std::log(x) / boost::math::constants::ln_two<double>(); // ln(x)/ln(2)
-}
 
 //inline float log2(float x)
 //{

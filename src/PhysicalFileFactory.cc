@@ -20,6 +20,9 @@
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/bzip2.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/filter/lzma.hpp>
+#include <boost/iostreams/filter/zstd.hpp>
+
 #include <boost/filesystem.hpp>
 
 using namespace std;
@@ -71,7 +74,9 @@ private:
     std::ifstream mFile;
 };
 
-class GzippedInHolder : public FileFactory::InHolder
+
+template<typename Filter>
+class FilteredInHolder : public FileFactory::InHolder
 {
 public:
     virtual istream& operator*()
@@ -79,18 +84,18 @@ public:
         return mFilter;
     }
 
-    GzippedInHolder(const string& pFileName)
-        : mFileName(pFileName), mFile(mFileName.c_str(), ios::binary )
+    FilteredInHolder(const string& pFileName)
+        : mFileName(pFileName), mFile(mFileName.c_str(), ios::binary)
     {
         if (!mFile.good())
         {
             BOOST_THROW_EXCEPTION(
                 Gossamer::error()
-                    << errinfo_errno(errno)
-                    << errinfo_file_name(mFileName));
+                << errinfo_errno(errno)
+                << errinfo_file_name(mFileName));
         }
         mFile.exceptions(std::ifstream::badbit);
-        mFilter.push(gzip_decompressor());
+        mFilter.push(Filter());
         mFilter.push(mFile);
     }
 
@@ -100,35 +105,6 @@ private:
     filtering_stream<input> mFilter;
 };
 
-
-class BzippedInHolder : public FileFactory::InHolder
-{
-public:
-    virtual istream& operator*()
-    {
-        return mFilter;
-    }
-
-    BzippedInHolder(const string& pFileName)
-        : mFileName(pFileName), mFile(mFileName.c_str(), ios::binary )
-    {
-        if (!mFile.good())
-        {
-            BOOST_THROW_EXCEPTION(
-                Gossamer::error()
-                    << errinfo_errno(errno)
-                    << errinfo_file_name(mFileName));
-        }
-        mFile.exceptions(std::ifstream::badbit);
-        mFilter.push(bzip2_decompressor(false, 63493103));
-        mFilter.push(mFile);
-    }
-
-private:
-    string mFileName;
-    std::ifstream mFile;
-    filtering_stream<input> mFilter;
-};
 
 
 class StdCoutHolder : public FileFactory::OutHolder
@@ -193,7 +169,9 @@ private:
     MappedFile<uint8_t> mMapped;
 };
 
-class GzippedOutHolder : public FileFactory::OutHolder
+
+template<typename Filter>
+class FilteredOutHolder : public FileFactory::OutHolder
 {
 public:
     virtual ostream& operator*()
@@ -201,7 +179,7 @@ public:
         return mFilter;
     }
 
-    GzippedOutHolder(const string& pFileName, FileFactory::FileMode pMode)
+    FilteredOutHolder(const string& pFileName, FileFactory::FileMode pMode)
         : mFileName(pFileName), mFile(mFileName.c_str(), (pMode == FileFactory::TruncMode ? ios::trunc : ios::app) | ios::binary )
     {
         if (!mFile.good())
@@ -212,37 +190,7 @@ public:
                     << errinfo_file_name(mFileName));
         }
         mFile.exceptions(std::ofstream::badbit);
-        mFilter.push(gzip_compressor());
-        mFilter.push(mFile);
-    }
-
-private:
-    string mFileName;
-    std::ofstream mFile;
-    filtering_stream<output> mFilter;
-};
-
-
-class BzippedOutHolder : public FileFactory::OutHolder
-{
-public:
-    virtual ostream& operator*()
-    {
-        return mFilter;
-    }
-
-    BzippedOutHolder(const string& pFileName, FileFactory::FileMode pMode)
-        : mFileName(pFileName), mFile(mFileName.c_str(), (pMode == FileFactory::TruncMode ? ios::trunc : ios::app) | ios::binary )
-    {
-        if (!mFile.good())
-        {
-            BOOST_THROW_EXCEPTION(
-                Gossamer::error()
-                    << errinfo_errno(errno)
-                    << errinfo_file_name(mFileName));
-        }
-        mFile.exceptions(std::ofstream::badbit);
-        mFilter.push(bzip2_compressor());
+        mFilter.push(Filter());
         mFilter.push(mFile);
     }
 
@@ -267,11 +215,19 @@ PhysicalFileFactory::in(const string& pFileName) const
     }
     if (mSpecialFileHandling && ends_with(pFileName, ".gz"))
     {
-        return InHolderPtr(new GzippedInHolder(pFileName));
+        return InHolderPtr(new FilteredInHolder<gzip_decompressor>(pFileName));
     }
     if (mSpecialFileHandling && ends_with(pFileName, ".bz2"))
     {
-        return InHolderPtr(new BzippedInHolder(pFileName));
+        return InHolderPtr(new FilteredInHolder<bzip2_decompressor>(pFileName));
+    }
+    if (mSpecialFileHandling && ends_with(pFileName, ".xz"))
+    {
+        return InHolderPtr(new FilteredInHolder<lzma_decompressor>(pFileName));
+    }
+    if (mSpecialFileHandling && ends_with(pFileName, ".zst"))
+    {
+        return InHolderPtr(new FilteredInHolder<zstd_decompressor>(pFileName));
     }
     return InHolderPtr(new PlainInHolder(pFileName));
 }
@@ -288,11 +244,19 @@ PhysicalFileFactory::out(const string& pFileName, FileMode pMode) const
     }
     if (mSpecialFileHandling && ends_with(pFileName, ".gz"))
     {
-        return OutHolderPtr(new GzippedOutHolder(pFileName, pMode));
+        return OutHolderPtr(new FilteredOutHolder<gzip_compressor>(pFileName, pMode));
     }
     if (mSpecialFileHandling && ends_with(pFileName, ".bz2"))
     {
-        return OutHolderPtr(new BzippedOutHolder(pFileName, pMode));
+        return OutHolderPtr(new FilteredOutHolder<bzip2_compressor>(pFileName, pMode));
+    }
+    if (mSpecialFileHandling && ends_with(pFileName, ".xz"))
+    {
+        return OutHolderPtr(new FilteredOutHolder<lzma_compressor>(pFileName, pMode));
+    }
+    if (mSpecialFileHandling && ends_with(pFileName, ".zst"))
+    {
+        return OutHolderPtr(new FilteredOutHolder<zstd_compressor>(pFileName, pMode));
     }
     return OutHolderPtr(new PlainOutHolder(pFileName, pMode));
 }

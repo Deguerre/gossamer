@@ -270,9 +270,9 @@ EstimateGraphStatistics::report(uint64_t pK) const
         = 100.0 * (cdf(poissDist, adjustedTrimPoint) - poissMassAtZero)
                 / (1.0 - poissMassAtZero);
     log(info, "Estimated real kmers to be trimmed = "
-        + lexical_cast<string>(clamp(0.0, trimmedFromNorm, 100.0)) + "%");
+        + lexical_cast<string>(std::clamp<double>(trimmedFromNorm, 0.0, 100.0)) + "%");
     log(info, "Estimated error kmers to be trimmed = "
-        + lexical_cast<string>(clamp(0.0, trimmedFromPoiss, 100.0)) + "%");
+        + lexical_cast<string>(std::clamp<double>(trimmedFromPoiss, 0.0, 100.0)) + "%");
 }
 
 

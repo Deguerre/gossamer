@@ -18,12 +18,13 @@ class GossCmdMergeAndAnnotateKmerSets : public GossCmd
 public:
     void operator()(const GossCmdContext& pCxt);
 
-    GossCmdMergeAndAnnotateKmerSets(const std::string& pLhs, const std::string& pRhs, const std::string& pOut)
-        : mLhs(pLhs), mRhs(pRhs), mOut(pOut)
+    GossCmdMergeAndAnnotateKmerSets(uint64_t pNumThreads, uint64_t pWorkingMemory, const std::string& pLhs, const std::string& pRhs, const std::string& pOut)
+        : mNumThreads(pNumThreads), mWorkingMemory(pWorkingMemory), mLhs(pLhs), mRhs(pRhs), mOut(pOut)
     {
     }
 
 private:
+    const uint64_t mNumThreads, mWorkingMemory;
     const std::string mLhs;
     const std::string mRhs;
     const std::string mOut;

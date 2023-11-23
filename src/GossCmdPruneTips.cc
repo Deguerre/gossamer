@@ -76,8 +76,8 @@ namespace // anonymous
             vector<uint64_t> zapRanks;
             int workQuantum = 10000ll;
 
-            bool cutoffCheck = mCutoff.get() > 0;
-            bool relCutoffCheck = mRelCutoff.get() > 0;
+            bool cutoffCheck = *mCutoff > 0;
+            bool relCutoffCheck = *mRelCutoff > 0;
 
             for (uint64_t i = mBegin; i < mEnd; ++i)
             {
@@ -169,7 +169,7 @@ namespace // anonymous
                 }
 
                 // Perform cutoff check
-                if (cutoffCheck && c < mRelCutoff.get())
+                if (cutoffCheck && c < *mRelCutoff)
                 {
                     continue;
                 }
@@ -197,7 +197,7 @@ namespace // anonymous
                     }
 
                     if (!okay ||
-                      (relCutoffCheck && c < totalCoverage * mRelCutoff.get()))
+                      (relCutoffCheck && c < totalCoverage * *mRelCutoff))
                     {
                         continue;
                     }
@@ -229,10 +229,10 @@ namespace // anonymous
 
         Block(MultithreadedBatchTask& pTask, const Graph& pGraph,
               dynamic_bitset<>& pZapped, std::mutex& pMutex,
-              boost::atomic<uint64_t>& pTipCount, boost::atomic<uint64_t>& pZapCount,
+              std::atomic<uint64_t>& pTipCount, std::atomic<uint64_t>& pZapCount,
               uint64_t pBegin, uint64_t pEnd,
-              const optional<uint64_t> pCutoff,
-              const optional<double> pRelCutoff)
+              const std::optional<uint64_t> pCutoff,
+              const std::optional<double> pRelCutoff)
             : MultithreadedBatchTask::WorkThread(pTask),
               mGraph(pGraph), mZapped(pZapped), mMutex(pMutex),
               mTipCount(pTipCount), mZapCount(pZapCount),
@@ -244,12 +244,12 @@ namespace // anonymous
         const Graph& mGraph;
         dynamic_bitset<>& mZapped;
         std::mutex& mMutex;
-        boost::atomic<uint64_t>& mTipCount;
-        boost::atomic<uint64_t>& mZapCount;
+        std::atomic<uint64_t>& mTipCount;
+        std::atomic<uint64_t>& mZapCount;
         const uint64_t mBegin;
         const uint64_t mEnd;
-        const optional<uint64_t> mCutoff;
-        const optional<double> mRelCutoff;
+        const std::optional<uint64_t> mCutoff;
+        const std::optional<double> mRelCutoff;
     };
     typedef std::shared_ptr<Block> BlockPtr;
 
@@ -281,8 +281,8 @@ GossCmdPruneTips::operator()(const GossCmdContext& pCxt)
         dynamic_bitset<> zapped(g.count());
         std::mutex mtx;
 
-        boost::atomic<uint64_t> zapCount(0);
-        boost::atomic<uint64_t> tipCount(0);
+        std::atomic<uint64_t> zapCount(0);
+        std::atomic<uint64_t> tipCount(0);
 
         log(info, "locating tips (iteration " + lexical_cast<string>(iteration + 1) + ")");
 
@@ -359,17 +359,17 @@ GossCmdFactoryPruneTips::create(App& pApp, const variables_map& pOpts)
     uint64_t I = 1;
     chk.getOptional("iterate", I);
 
-    optional<uint64_t> c;
+    std::optional<uint64_t> c;
     chk.getOptional("cutoff", c);
 
-    optional<double> relC;
+    std::optional<double> relC;
     chk.getOptional("relative-cutoff", relC);
 
     uint64_t t = 4;
     chk.getOptional("num-threads", t);
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdPruneTips(in, out, c, relC, t, I));
+    return make_goss_cmd<GossCmdPruneTips>(in, out, c, relC, t, I);
 }
 
 GossCmdFactoryPruneTips::GossCmdFactoryPruneTips()

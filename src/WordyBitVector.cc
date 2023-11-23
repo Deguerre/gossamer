@@ -7,25 +7,34 @@
 // Please see the file LICENSE, included with this distribution.
 //
 #include "WordyBitVector.hh"
+#include <boost/preprocessor/repetition/repeat.hpp>
+#include <boost/preprocessor/tuple/elem.hpp>
 
 WordyBitVector::Builder::Builder(const std::string& pName, FileFactory& pFactory)
     : mFile(pName, pFactory),
-      mCurrPos(0), mFileWordNum(0), mCurrWordNum(0), mCurrWord(0)
+      mCurrPos(0), mFileWordNum(0), mCurrWordNum(0), mCurrWord(0), mBufferCount(0)
 {
+    std::memset(mBuffer, 0, sizeof(mBuffer));
 }
 
 
 void
 WordyBitVector::Builder::flush()
 {
-    while (mFileWordNum < mCurrWordNum)
-    {
-        uint64_t zero = 0;
-        mFile.push_back(zero);
-        ++mFileWordNum;
+    constexpr unsigned writeBufferSize = bufferSize / wordBits;
+    uint64_t writeBuffer[writeBufferSize];
+    for (unsigned i = 0; i < writeBufferSize; ++i) {
+        uint64_t word = 0;
+#define SET_WORD_BIT(z, n, unused) \
+        word |= uint64_t(mBuffer[i * wordBits + n]) << n;
+        BOOST_PP_REPEAT(64, SET_WORD_BIT, ~)
+#undef SET_WORD_BIT
+        writeBuffer[i] = word;
     }
-    mFile.push_back(mCurrWord);
-    ++mFileWordNum;
+    mFile.push_back_multiple(writeBuffer, writeBufferSize);
+    mFileWordNum += writeBufferSize;
+    std::memset(mBuffer, 0, sizeof(mBuffer));
+    mBufferCount = 0;
 }
 
 
@@ -76,3 +85,12 @@ WordyBitVector::popcountRange(uint64_t pBegin, uint64_t pEnd) const
     return rank;
 }
 
+
+void
+WordyBitVector::prepopulate() const
+{
+#ifdef GOSS_PLATFORM_WINDOWS
+    WIN32_MEMORY_RANGE_ENTRY range = { (PVOID)mWords.begin(), mWords.size() * sizeof(uint64_t) };
+    ::PrefetchVirtualMemory(::GetCurrentProcess(), 1, &range, 0);
+#endif
+}

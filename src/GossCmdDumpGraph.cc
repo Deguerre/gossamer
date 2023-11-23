@@ -76,7 +76,7 @@ GossCmdFactoryDumpGraph::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdDumpGraph(in, out));
+    return make_goss_cmd<GossCmdDumpGraph>(in, out);
 }
 
 GossCmdFactoryDumpGraph::GossCmdFactoryDumpGraph()

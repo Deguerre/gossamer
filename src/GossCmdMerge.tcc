@@ -15,12 +15,6 @@
 #include <string>
 #include <boost/lexical_cast.hpp>
 
-using namespace boost;
-using namespace boost::program_options;
-using namespace std;
-
-typedef vector<string> strings;
-
 namespace // anonymous
 {
     const uint64_t gMaxCount = 1ULL << 63;
@@ -29,11 +23,11 @@ namespace // anonymous
     class Merge
     {
     public:
-        typedef boost::shared_ptr<Merge<T> > Ptr;
+        typedef std::shared_ptr<Merge<T> > Ptr;
 
         virtual bool valid() const = 0;
 
-        virtual const pair<typename T::Edge,uint32_t>& curr() const = 0;
+        virtual const std::pair<typename T::Edge,std::uint32_t>& curr() const = 0;
 
         virtual void next() = 0;
 
@@ -49,7 +43,7 @@ namespace // anonymous
             return mItr.valid();
         }
 
-        virtual const pair<typename T::Edge,uint32_t>& curr() const
+        virtual const std::pair<typename T::Edge,std::uint32_t>& curr() const
         {
             return mCurr;
         }
@@ -64,7 +58,7 @@ namespace // anonymous
             }
         }
 
-        CursorMerge(const string& pBaseName, FileFactory& pFactory)
+        CursorMerge(const std::string& pBaseName, FileFactory& pFactory)
             : mItr(pBaseName, pFactory), mCurr(typename T::Edge(Gossamer::position_type(0)), 0)
         {
             if (mItr.valid())
@@ -75,7 +69,7 @@ namespace // anonymous
 
     private:
         typename T::LazyIterator mItr;
-        pair<typename T::Edge,uint32_t> mCurr;
+        std::pair<typename T::Edge,std::uint32_t> mCurr;
     };
 
     template <typename T>
@@ -87,7 +81,7 @@ namespace // anonymous
             return mValid;
         }
 
-        virtual const pair<typename T::Edge,uint32_t>& curr() const
+        virtual const std::pair<typename T::Edge,std::uint32_t>& curr() const
         {
             return mCurr;
         }
@@ -143,7 +137,7 @@ namespace // anonymous
         Merge<T>& mRhs;
         bool mValid;
         bool mLeft;
-        pair<typename T::Edge,uint32_t> mCurr;
+        std::pair<typename T::Edge,std::uint32_t> mCurr;
     };
 
 } // namespace anonymous
@@ -207,7 +201,7 @@ GossCmdMerge<T>::operator()(const GossCmdContext& pCxt)
 
 template<typename T>
 void
-GossCmdMerge<T>::merge(const strings& pIns, const string& pOut, const GossCmdContext& pCxt)
+GossCmdMerge<T>::merge(const std::vector<std::string>& pIns, const std::string& pOut, const GossCmdContext& pCxt)
 {
     BOOST_ASSERT(pIns.size() > 0);
 
@@ -328,24 +322,24 @@ GossCmdMerge<T>::merge(const strings& pIns, const string& pOut, const GossCmdCon
 
 template<typename T>
 GossCmdPtr
-GossCmdFactoryMerge<T>::create(App& pApp, const variables_map& pOpts)
+GossCmdFactoryMerge<T>::create(App& pApp, const boost::program_options::variables_map& pOpts)
 {
     GossOptionChecker chk(pOpts);
 
-    strings ins;
+    std::vector<std::string> ins;
     chk.getRepeating0("graph-in", ins);
 
-    string inFileName;
+    std::string inFileName;
     chk.getOptional("graphs-in", inFileName);
     if (inFileName.size())
     {
         FileFactory& fac = pApp.fileFactory();
         FileFactory::InHolderPtr inp = fac.in(inFileName);
-        istream& in(**inp);
+        std::istream& in(**inp);
         while (in.good())
         {
-            string l;
-            getline(in, l);
+            std::string l;
+            std::getline(in, l);
             if (!in.good())
             {
                 break;
@@ -359,16 +353,16 @@ GossCmdFactoryMerge<T>::create(App& pApp, const variables_map& pOpts)
         chk.addError("At least one input graph must be supplied either using --graph-in or --graphs-in.\n");
     }
 
-    uint64_t maxMerge = 8;
+    std::uint64_t maxMerge = 8;
     chk.getOptional("max-merge", maxMerge);
 
-    string out;
+    std::string out;
     FileFactory& fac(pApp.fileFactory());
     chk.getMandatory("graph-out", out, GossOptionChecker::FileCreateCheck(fac, true));
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdMerge<T>(ins, maxMerge, out));
+    return make_goss_cmd<GossCmdMerge<T>>(ins, maxMerge, out);
 }
 
 template<typename T>

@@ -315,7 +315,7 @@ GossCmdBuildGraph::operator()(const GossCmdContext& pCxt)
     BackyardHash h(mS, 2 * rho, mN);
     BackyardConsumer bc(h);
 
-    BackgroundMultiConsumer<KmerBlockPtr> bg(4096);
+    BackgroundMultiConsumer<KmerBlockPtr> bg(1024);
     for (uint64_t i = 0; i < mT; ++i)
     {
         bg.add(bc);
@@ -473,7 +473,7 @@ GossCmdFactoryBuildGraph::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdBuildGraph(K, S, N, T, graphName, fastaNames, fastqNames, lineNames));
+    return make_goss_cmd<GossCmdBuildGraph>(K, S, N, T, graphName, fastaNames, fastqNames, lineNames);
 }
 
 GossCmdFactoryBuildGraph::GossCmdFactoryBuildGraph()

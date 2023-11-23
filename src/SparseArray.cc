@@ -36,11 +36,22 @@ SparseArray::Iterator::Iterator(const SparseArray& pArray)
     : mArray(&pArray), mHiItr(mArray->mHighBits.iterator1()),
       mI(0), mValid(true)
 {
-    if (!pArray.count())
-    {
+    if (!pArray.count()) {
+        mValid = false;
+    }
+}
+
+
+SparseArray::Iterator::Iterator(const SparseArray& pArray, rank_type pBeginRank)
+    : mArray(&pArray), mHiItr(mArray->mHighBits.iterator1()), mI(pBeginRank), mValid(true)
+{
+    if (mI >= pArray.count()) {
         mValid = false;
         return;
     }
+
+    auto pos = pArray.mD1.select(pBeginRank);
+    mHiItr.setPosition(pos);
 }
 
 
@@ -159,6 +170,15 @@ SparseArray::stat() const
     t.putProp("storage", s);
 
     return t;
+}
+
+
+void
+SparseArray::prepopulate()
+{
+    mHighBits.prepopulate();
+    mD0.prepopulate();
+    mD1.prepopulate();
 }
 
 void

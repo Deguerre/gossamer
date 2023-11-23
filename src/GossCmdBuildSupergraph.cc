@@ -73,7 +73,7 @@ GossCmdFactoryBuildSupergraph::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdBuildSupergraph(in, del));
+    return make_goss_cmd<GossCmdBuildSupergraph>(in, del);
 }
 
 GossCmdFactoryBuildSupergraph::GossCmdFactoryBuildSupergraph()

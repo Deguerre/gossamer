@@ -20,7 +20,7 @@ public:
 
     GossCmdTrimGraph(const std::string& pIn, const std::string& pOut,
                      uint64_t pC, bool pInferCutoff, bool pEstimateOnly,
-                     const boost::optional<uint64_t>& pScaleCutoffByK)
+                     const std::optional<uint64_t>& pScaleCutoffByK)
         : mIn(pIn), mOut(pOut), mC(pC),
           mInferCutoff(pInferCutoff), mEstimateOnly(pEstimateOnly),
           mScaleCutoffByK(pScaleCutoffByK)
@@ -33,7 +33,7 @@ private:
     const uint64_t mC;
     const bool mInferCutoff;
     const bool mEstimateOnly;
-    const boost::optional<uint64_t> mScaleCutoffByK;
+    const std::optional<uint64_t> mScaleCutoffByK;
 };
 
 

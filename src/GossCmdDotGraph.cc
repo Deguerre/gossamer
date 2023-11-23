@@ -525,7 +525,7 @@ GossCmdFactoryDotGraph::create(App& pApp, const variables_map& pOpts)
                        : scale_sqrt ? GossCmdDotGraph::Style::Sqrt
                        : GossCmdDotGraph::Style::Log;
 
-    return GossCmdPtr(new GossCmdDotGraph(in, out, fastaNames, fastqNames, lineNames, skipSings, style));
+    return make_goss_cmd<GossCmdDotGraph>(in, out, fastaNames, fastqNames, lineNames, skipSings, style);
 }
 
 GossCmdFactoryDotGraph::GossCmdFactoryDotGraph()

@@ -285,7 +285,7 @@ GossCmdFactoryPoolSamples::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdPoolSamples(K, S, N, T, out, fastaNames, fastqNames, kmerSetNames));
+    return make_goss_cmd<GossCmdPoolSamples>(K, S, N, T, out, fastaNames, fastqNames, kmerSetNames);
 }
 
 GossCmdFactoryPoolSamples::GossCmdFactoryPoolSamples()

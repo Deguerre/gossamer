@@ -64,7 +64,7 @@ GossCmdPtr
 GossCmdFactoryHelp::create(App& pApp,
                            const boost::program_options::variables_map& pOpts)
 {
-    return GossCmdPtr(new GossCmdHelp(pApp.name()));
+    return make_goss_cmd<GossCmdHelp>(pApp.name());
 }
 
 GossCmdFactoryHelp::GossCmdFactoryHelp(const App& pApp)

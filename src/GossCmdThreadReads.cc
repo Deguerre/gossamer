@@ -1099,8 +1099,8 @@ GossCmdFactoryThreadReads::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdThreadReads(in, fastas, fastqs, lines, 
-                                             c, inferCoverage, expectedCoverage, T, cr, del));
+    return make_goss_cmd<GossCmdThreadReads>(in, fastas, fastqs, lines,
+                                             c, inferCoverage, expectedCoverage, T, cr, del);
 }
 
 GossCmdFactoryThreadReads::GossCmdFactoryThreadReads()

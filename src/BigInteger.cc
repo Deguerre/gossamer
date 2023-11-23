@@ -76,34 +76,19 @@ BigIntegerBase::writeDecimal(ostream& pIO, word_type* pWords,
                 --highWord;
             }
 
-#ifdef USE_UINT_128_T
-            word_type remainder = 0;
+            const uint64_t wordRem = ((~uint64_t(0) % radix) + 1) % radix;
+            const uint64_t wordQuo = radix % 2 == 0 ? (uint64_t(1) << 63) / (radix/2) : ((~uint64_t(0) - wordRem + 1) / radix);
+            uint64_t remainder = 0;
             for (int64_t i = highWord; i >= 0; --i)
             {
-                double_word_type dividend = (double_word_type(remainder) << sBitsPerWord) | pWords[i];
-                pWords[i] = static_cast<word_type>(dividend / radix);
-                remainder = static_cast<word_type>(dividend % radix);
+                auto wQuo = pWords[i] / radix;
+                auto wRem = pWords[i] % radix;
+                auto wAdj = remainder * wordRem + wRem;
+                auto wAdjQuo = wAdj / radix;
+                auto wAdjRem = wAdj % radix;
+                pWords[i] = remainder * wordQuo + wQuo + wAdjQuo;
+                remainder = wAdjRem;
             }
-#else
-            // since we can't use 128bit intrinsics, lets use 32 bit integers
-            // this is not safe for big endians (or the other way round?)
-            half_word_type* pHalfWords = (half_word_type*)( pWords );
-            int i = highWord*2 + 1; // index into pWords32
-            
-            // the first half word maybe blank
-            if( !pHalfWords[i] ) {
-                --i;
-            }
-
-            half_word_type remainder = 0;
-            for (; i >= 0; --i)
-            {
-                word_type dividend = ( word_type(remainder) << (sBitsPerWord/2) ) | pHalfWords[i];
-                pHalfWords[i] = static_cast<half_word_type>(dividend / radix);
-                remainder = static_cast<half_word_type>(dividend % radix);
-            }
-#endif
-
 
             *--cs = sLiteralDigitsLc[remainder];
             ++cslen;

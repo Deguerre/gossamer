@@ -19,9 +19,9 @@
 #define BOOST_UTILITY_HPP
 #endif
 
-#ifndef BOOST_FUNCTION_HPP
-#include <boost/function.hpp>
-#define BOOST_FUNCTION_HPP
+#ifndef STD_FUNCTIONAL
+#include <functional>
+#define STD_FUNCTIONAL
 #endif
 
 #ifndef BOOST_NUMERIC_UBLAS_VECTOR_HPP

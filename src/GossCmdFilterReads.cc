@@ -345,7 +345,7 @@ GossCmdFactoryFilterReads::create(App& pApp, const boost::program_options::varia
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdFilterReads(in, fastas, fastqs, lines, pairs, count, T, match, nonmatch));
+    return make_goss_cmd<GossCmdFilterReads>(in, fastas, fastqs, lines, pairs, count, T, match, nonmatch);
 }
 
 GossCmdFactoryFilterReads::GossCmdFactoryFilterReads()

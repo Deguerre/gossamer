@@ -64,63 +64,21 @@
 #define SIGNAL_H
 #endif
 
-// Identify the platform.  At the moment, we only have three
-// platforms:
-//
-//     - Linux x86-64 (here called GOSS_LINUX_X64), GCC or Clang
-//     - Mac OSX x86-64 (here called GOSS_MACOSX_X64), Clang
-//     - Windows x86-64 (here called GOSS_WINDOWS_X64), MSVC (untested)
-
-#undef GOSS_WINDOWS_X64
-#undef GOSS_MACOSX_X64
-#undef GOSS_LINUX_X64
-
-#if defined(GOSS_PLATFORM_WINDOWS)
-
-#ifndef GOSS_COMPILER_MSVC
-#warning "This appears to be a build on Windows with a compiler other than MSVC. This may not work."
+#ifndef STD_OPTIONAL
+#include <optional>
+#define STD_OPTIONAL
 #endif
 
-#define GOSS_WINDOWS_X64
-#include "MachDepWindows.hh"
-
-#elif defined(GOSS_PLATFORM_OSX)
-
-#ifndef GOSS_COMPILER_CLANG
-#error "This appears to be a build on OS X with a compiler other than Clang. This is an untested combination."
+#ifndef STD_FUTURE
+#include <future>
+#define STD_FUTURE
 #endif
 
-#if defined(__x86_64__)
-#define GOSS_MACOSX_X64
-#include "MachDepMacOSX.hh"
-#else
-#error "This appears to be a build on non-Intel OS X."
+
+
+#ifndef MACHDEPPLATFORM_HH
+#include "MachDepPlatform.hh"
 #endif
-
-#elif defined(GOSS_PLATFORM_UNIX)
-
-#if defined(linux) || defined(__linux__)
-#define GOSS_PLATFORM_LINUX
-#if !defined(GOSS_COMPILER_GNU) && !defined(GOSS_COMPILER_CLANG)
-#error "This appears to be a build on Linux with an unknown compiler."
-#endif
-#else
-#error "This appears to be a build on an unknown Unix-like OS. This is an untested combination."
-#endif
-
-#if !defined(__x86_64__)
-#error "This appears to be a build on a non-Intel Unix-like platform. This is an untested combination."
-#endif
-
-#define GOSS_LINUX_X64
-#include "MachDepLinux.hh"
-
-#else
-
-#error "Can't work out what platform this is. This build will probably fail."
-
-#endif
-
 
 class MachineAutoSetup
 {
@@ -145,6 +103,21 @@ private:
 
 namespace Gossamer
 {
+    static constexpr unsigned sPageAlignBits = 16;
+
+    // Align up
+    inline constexpr uint64_t align_up(uint64_t x, unsigned bits)
+    {
+        const uint64_t mask = (uint64_t(1) << bits) - 1;
+        return (x + mask) & ~mask;
+    }
+
+    // Align down
+    inline constexpr uint64_t align_down(uint64_t x, unsigned bits)
+    {
+        const uint64_t mask = (uint64_t(1) << bits) - 1;
+        return x & ~mask;
+    }
 
 
 /// Get the number of logical processors on this machine.
@@ -156,7 +129,7 @@ inline uint32_t popcnt(uint64_t pWord)
     BOOST_STATIC_ASSERT(sizeof(long) == 8 || sizeof(unsigned long long) == 8);
 
 #if defined(GOSS_WINDOWS_X64)
-    return (*Windows::sPopcnt64)(pWord);
+    return __popcnt64(pWord);
 #elif defined(GOSS_LINUX_X64) || defined(GOSS_MACOSX_X64)
     if (sizeof(long) == 8)
     {
@@ -236,6 +209,7 @@ inline uint64_t find_first_set(uint64_t pWord)
     }
 #elif defined(GOSS_WINDOWS_X64)
  
+#if 0
     // _BitScanForward64 returns the zero based
     // index of the first set bit. We want 1 
     // Note that VC++'s documentation does not
@@ -251,6 +225,9 @@ inline uint64_t find_first_set(uint64_t pWord)
         _BitScanForward64(&idx, pWord);
         return idx + 1;
     }
+#else
+    return _tzcnt_u64(pWord) + 1;
+#endif
 
 #else
     // ffsl() is in XSB as of POSIX:2004.
@@ -331,9 +308,52 @@ inline uint64_t select_by_vigna(uint64_t pWord, uint64_t pR)
 }
 
 
+inline uint64_t select_by_mask(uint64_t pWord, int pR)
+{
+    int t, i = pR, r = 0;
+    const uint64_t m1 = 0x5555555555555555ULL; // even bits
+    const uint64_t m2 = 0x3333333333333333ULL; // even 2-bit groups
+    const uint64_t m4 = 0x0f0f0f0f0f0f0f0fULL; // even nibbles
+    const uint64_t m8 = 0x00ff00ff00ff00ffULL; // even bytes
+    uint64_t c1 = pWord;
+    uint64_t c2 = c1 - ((c1 >> 1) & m1);
+    uint64_t c4 = ((c2 >> 2) & m2) + (c2 & m2);
+    uint64_t c8 = ((c4 >> 4) + c4) & m4;
+    uint64_t c16 = ((c8 >> 8) + c8) & m8;
+    uint64_t c32 = (c16 >> 16) + c16;
+    uint64_t c64 = (((c32 >> 32) + c32) & 0x7f);
+    t = (c32) & 0x3f;
+    if (i >= t) { r += 32; i -= t; }
+    t = (c16 >> r) & 0x1f;
+    if (i >= t) { r += 16; i -= t; }
+    t = (c8 >> r) & 0x0f;
+    if (i >= t) { r += 8; i -= t; }
+    t = (c4 >> r) & 0x07;
+    if (i >= t) { r += 4; i -= t; }
+    t = (c2 >> r) & 0x03;
+    if (i >= t) { r += 2; i -= t; }
+    t = (c1 >> r) & 0x01;
+    if (i >= t) { r += 1; }
+    return pR >= c64 ? -1 : r;
+}
+
+
+#ifdef GOSS_USE_PDEP
+inline uint64_t select_by_pdep(uint64_t pWord, uint64_t pR)
+{
+    uint64_t bit = _pdep_u64(uint64_t(1) << pR, pWord);
+    return find_first_set(bit) - 1;
+}
+#endif
+
+
 inline uint64_t select1(uint64_t pWord, uint64_t pRank)
 {
+#ifdef GOSS_USE_PDEP
+    return select_by_pdep(pWord, pRank);
+#else
     return select_by_vigna(pWord, pRank);
+#endif
 }
 
 
@@ -365,7 +385,7 @@ inline uint64_t roundUpToNextPowerOf2(uint64_t pX)
 
 
 // Base-4 hamming distance
-inline uint32_t ham(uint64_t x, uint64_t y)
+inline uint32_t hammingDistanceBase4(uint64_t x, uint64_t y)
 {
     static const uint64_t m = 0x5555555555555555ULL;
     uint64_t v = x ^ y;
@@ -374,8 +394,9 @@ inline uint32_t ham(uint64_t x, uint64_t y)
 
 
 // Base-4 reverse
-inline uint64_t rev(uint64_t x)
+inline uint64_t reverseBase4(uint64_t x)
 {
+#if 0
     static const uint64_t m2  = 0x3333333333333333ULL;
     static const uint64_t m2p = m2 << 2;
     static const uint64_t m4  = 0x0F0F0F0F0F0F0F0FULL;
@@ -393,13 +414,23 @@ inline uint64_t rev(uint64_t x)
     x = ((x & m16) << 16) | ((x & m16p) >> 16);
     x = ((x & m32) << 32) | ((x & m32p) >> 32);
     return x;
+#else
+    static const uint64_t m2 = 0x3333333333333333ULL;
+    static const uint64_t m2p = m2 << 2;
+    static const uint64_t m4 = 0x0F0F0F0F0F0F0F0FULL;
+    static const uint64_t m4p = m4 << 4;
+
+    x = ((x & m2) << 2) | ((x & m2p) >> 2);
+    x = ((x & m4) << 4) | ((x & m4p) >> 4);
+    return Gossamer::byte_swap_64(x);
+#endif
 }
 
 
 // Reverse complement
 inline uint64_t reverseComplement(const uint64_t k, uint64_t x)
 {
-    x = rev(~x);
+    x = reverseBase4(~x);
     return x >> (2 * (32 - k));
 }
 
@@ -448,6 +479,32 @@ inline double logChoose(uint64_t n, uint64_t k)
 }
 
 
+// Binomial distribution confidence interval.
+inline std::pair<double,double>
+binomialConfidenceInterval(uint64_t m, uint64_t n, double z = 1.96)
+{
+    const double p = (double)m / n;
+    const double z2 = z * z;
+    const double invdenom = 0.5 / (n + z2);
+    const double width = z * std::sqrt(z2 - 1.0 / n + 4 * n * p * (1 - p) + (4 * p - 1)) + 1;
+    const double mid = 2 * n * p + z2;
+    const double wmin = p == 0 ? 0 : std::max(0.0, (mid - width) * invdenom);
+    const double wmax = p == 1 ? 1 : std::min(1.0, (mid + width) * invdenom);
+    return std::pair(wmin, wmax);
+}
+
+
+// Base-2^64 expansion of the golden ratio, useful for hash seeds.
+constexpr uint64_t sPhi0 = 0x9e3779b97f4a7c15ull;
+constexpr uint64_t sPhi1 = 0xf39cc0605cedc834ull;
+constexpr uint64_t sPhi2 = 0x1082276bf3a27251ull;
+constexpr uint64_t sPhi3 = 0xf86c6a11d0c18e95ull;
+constexpr uint64_t sPhi4 = 0x2767f0b153d27b7full;
+constexpr uint64_t sPhi5 = 0x0347045b5bf1827full;
+constexpr uint64_t sPhi6 = 0x01886f0928403002ull;
+constexpr uint64_t sPhi7 = 0xc1d64ba40f335e36ull;
+
+
 template<typename T>
 inline
 T clamp(T pMin, T pX, T pMax)
@@ -490,9 +547,8 @@ template<class Container>
 inline void
 sortAndUnique(Container& pContainer)
 {
-    using namespace std;
-    sort(pContainer.begin(), pContainer.end());
-    pContainer.erase(unique(pContainer.begin(), pContainer.end()),
+    std::sort(pContainer.begin(), pContainer.end());
+    pContainer.erase(std::unique(pContainer.begin(), pContainer.end()),
             pContainer.end());
 }
 
@@ -542,13 +598,13 @@ struct BaseOpt : Base
 
 // Custom version of lower_bound, optimised for pointers.
 //
-template<typename T>
+template<typename T, int Min = 32>
 const T*
-lower_bound(const T* pBegin, const T* pEnd, const T& pKey)
+lower_bound_on_pointers(const T* pBegin, const T* pEnd, const T& pKey)
 {
     ptrdiff_t len = pEnd - pBegin;
 
-    while (len > 0)
+    while (len > Min)
     {
         ptrdiff_t half = len >> 1;
         const T* middle = pBegin + half;
@@ -563,6 +619,11 @@ lower_bound(const T* pBegin, const T* pEnd, const T& pKey)
         }
     }
 
+    while (len > 0 && *pBegin < pKey) {
+        --len;
+        ++pBegin;
+    }
+
     return pBegin;
 }
 
@@ -570,9 +631,9 @@ lower_bound(const T* pBegin, const T* pEnd, const T& pKey)
 // Custom version of lower_bound, which converts from binary
 // search to linear search once the gap is small enough.
 //
-template<typename It, typename T, typename Comp, int Min>
+template<typename It, typename T, typename Comp, int Min = 32>
 It
-tuned_lower_bound(const It& pBegin, const It& pEnd, const T& pKey, Comp pComp)
+tuned_lower_bound(const It& pBegin, const It& pEnd, const T& pKey, Comp pComp = Comp())
 {
     auto len = std::distance(pBegin, pEnd);
     It s = pBegin;
@@ -605,13 +666,13 @@ tuned_lower_bound(const It& pBegin, const It& pEnd, const T& pKey, Comp pComp)
 
 // Custom version of upper_bound, optimised for pointers.
 //
-template<typename T>
+template<typename T, int Min = 32>
 const T*
-upper_bound(const T* pBegin, const T* pEnd, const T& pKey)
+upper_bound_on_pointers(const T* pBegin, const T* pEnd, const T& pKey)
 {
     ptrdiff_t len = pEnd - pBegin;
 
-    while (len > 0)
+    while (len > Min)
     {
         ptrdiff_t half = len >> 1;
         const T* middle = pBegin + half;
@@ -626,7 +687,17 @@ upper_bound(const T* pBegin, const T* pEnd, const T& pKey)
         }
     }
 
-    return pBegin;
+    auto s = pBegin + len;
+    while (len > 0) {
+        --s;
+        if (!(pKey < *s)) {
+            ++s;
+            break;
+        }
+        --len;
+    }
+
+    return s;
 }
 
 
@@ -634,9 +705,9 @@ upper_bound(const T* pBegin, const T* pEnd, const T& pKey)
 // Custom version of upper_bound, which converts from binary
 // search to linear search once the gap is small enough.
 //
-template<typename It, typename T, typename Comp, int Min>
+template<typename It, typename T, typename Comp = std::less<T>, int Min = 32>
 It
-tuned_upper_bound(const It& pBegin, const It& pEnd, const T& pKey, Comp pComp)
+tuned_upper_bound(const It& pBegin, const It& pEnd, const T& pKey, Comp pComp = Comp())
 {
     auto len = std::distance(pBegin, pEnd);
     It s = pBegin;
@@ -671,6 +742,199 @@ tuned_upper_bound(const It& pBegin, const It& pEnd, const T& pKey, Comp pComp)
     return s;
 }
 
+
+// Combined upper_bound and lower_bound.
+//
+template<typename T, int Min = 32>
+std::pair<const T*, const T*>
+lower_and_upper_bound_on_pointers(const T* pBegin, const T* pEnd, const T& pLowerKey, const T& pUpperKey)
+{
+    std::pair<const T*, const T*> retval;
+    ptrdiff_t len = pEnd - pBegin;
+    const T* s = pBegin;
+
+    while (len > Min)
+    {
+        auto half = len >> 1;
+        const T* m = s + half;
+        if (*m < pLowerKey)
+        {
+            s = m;
+            ++s;
+            len -= half + 1;
+        }
+        else if (pUpperKey < *m)
+        {
+            len = half;
+        }
+        else {
+            auto e = s + len;
+            retval.first = lower_bound_on_pointers(s, m, pLowerKey);
+            retval.second = upper_bound_on_pointers(m, e, pUpperKey);
+            return retval;
+        }
+    }
+
+    while (len > 0 && *s < pLowerKey) {
+        --len;
+        ++s;
+    }
+    retval.first = s;
+
+    s += len;
+    while (len > 0) {
+        --s;
+        if (!(pUpperKey < *s)) {
+            ++s;
+            break;
+        }
+        --len;
+    }
+    retval.second = s;
+    return retval;
+}
+
+
+
+
+// Combined upper_bound and lower_bound.
+//
+template<typename It, typename T, typename Comp = std::less<T>, int Min = 32>
+void
+tuned_lower_and_upper_bound(const It& pBegin, const It& pEnd, const T& pLowerKey, T& pUpperKey, It& pLower, It& pUpper, Comp pComp = Comp())
+{
+    auto len = std::distance(pBegin, pEnd);
+    It s = pBegin;
+
+    while (len > Min)
+    {
+        auto half = len >> 1;
+        It m = s;
+        std::advance(m, half);
+        if (pComp(*m, pLowerKey))
+        {
+            s = m;
+            std::advance(s, 1);
+            len -= half + 1;
+        }
+        else if (pComp(pUpperKey, *m))
+        {
+            len = half;
+        }
+        else {
+            auto e = s;
+            std::advance(e, len);
+            pLower = tuned_lower_bound<It, T, Comp, Min>(s, m, pLowerKey, pComp);
+            pUpper = tuned_upper_bound<It, T, Comp, Min>(m, e, pUpperKey, pComp);
+            return;
+        }
+    }
+
+    while (len > 0 && pComp(*s, pLowerKey)) {
+        --len;
+        ++s;
+    }
+    pLower = s;
+
+    std::advance(s, len);
+    while (len > 0) {
+        --s;
+        if (!pComp(pUpperKey, *s)) {
+            ++s;
+            break;
+        }
+        --len;
+    }
+    pUpper = s;
+}
+
+
+// Unroll a loop.
+//
+namespace detail {
+    template<class T, T... inds, class F>
+    inline constexpr void unrolled_loop(std::integer_sequence<T, inds...>, F&& f) {
+        (f(std::integral_constant<T, inds>{}), ...);
+    }
+}
+
+template<class T, T count, class F>
+inline constexpr void unrolled_loop(F&& f) {
+    detail::unrolled_loop(std::make_integer_sequence<T, count>{}, std::forward<F>(f));
+}
+
+
+// Check if a std::future is ready.
+//
+template<typename T>
+inline bool
+future_is_ready(const std::future<T>& f)
+{
+    return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+}
+
+class semaphore : private boost::noncopyable
+{
+private:
+    std::mutex mMutex;
+    std::condition_variable mCondVar;
+    size_t mCount;
+
+public:
+    semaphore(size_t pCount)
+        : mCount(pCount)
+    {
+    }
+
+    void acquire()
+    {
+        std::unique_lock<std::mutex> lock(mMutex);
+        mCondVar.wait(lock, [&]() { return mCount > 0; } );
+        --mCount;
+    }
+
+    void release()
+    {
+        std::unique_lock<std::mutex> lock(mMutex);
+        ++mCount;
+        mCondVar.notify_one();
+    }
+
+    bool try_acquire()
+    {
+        std::unique_lock<std::mutex> lock(mMutex);
+        if (!mCount) {
+            return false;
+        }
+
+        --mCount;
+        return true;
+    }
+
+#if 0
+    template <typename Duration>
+    bool try_acquire_for(const Duration& duration)
+    {
+        std::unique_lock<std::mutex> lock(mMutex);
+        if (!mCondVar.wait_for(lock, duration, [&]{ return mCount > 0; })) {
+            return false;
+        }
+        --mCount;
+        return true;
+    }
+
+    template <class TimePoint>
+    bool try_acquire_until(const TimePoint& timePoint)
+    {
+        std::unique_lock<std::mutex> lock(mMutex);
+        if (!mCondVar.wait_until(lock, duration, [&]{ return mCount > 0; })) {
+            return false;
+        }
+        --mCount;
+        return true;
+    }
+#endif
+};
 
 } // namespace Gossamer
 

@@ -267,7 +267,7 @@ GossCmdFactoryTrimPaths::create(App& pApp, const variables_map& pOpts)
     chk.getOptional("num-threads", t);
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdTrimPaths(in, out, numeric_cast<uint32_t>(c), t));
+    return make_goss_cmd<GossCmdTrimPaths>(in, out, numeric_cast<uint32_t>(c), t);
 }
 
 GossCmdFactoryTrimPaths::GossCmdFactoryTrimPaths()

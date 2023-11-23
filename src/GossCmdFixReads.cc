@@ -1259,7 +1259,7 @@ GossCmdFactoryFixReads::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdFixReads(g, fas, fqs, ls, out, T));
+    return make_goss_cmd<GossCmdFixReads>(g, fas, fqs, ls, out, T);
 }
 
 GossCmdFactoryFixReads::GossCmdFactoryFixReads()

@@ -302,8 +302,8 @@ TransCmdFactoryTrimRelative::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new TransCmdTrimRelative(in, out,
-            relCutoff, numThreads));
+    return make_goss_cmd<TransCmdTrimRelative>(in, out,
+            relCutoff, numThreads);
 }
 
 TransCmdFactoryTrimRelative::TransCmdFactoryTrimRelative()

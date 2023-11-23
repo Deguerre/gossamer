@@ -26,7 +26,7 @@
 #endif
 
 class IntegerArray;
-typedef boost::shared_ptr<IntegerArray> IntegerArrayPtr;
+typedef std::shared_ptr<IntegerArray> IntegerArrayPtr;
 
 class IntegerArray
 {
@@ -43,7 +43,7 @@ public:
 
         virtual ~Builder() {}
     };
-    typedef boost::shared_ptr<Builder> BuilderPtr;
+    typedef std::shared_ptr<Builder> BuilderPtr;
 
     class LazyIterator
     {
@@ -67,7 +67,7 @@ public:
         {
         }
     };
-    typedef boost::shared_ptr<LazyIterator> LazyIteratorPtr;
+    typedef std::shared_ptr<LazyIterator> LazyIteratorPtr;
 
     /**
      * Return the number of elements in the integer array.

@@ -43,11 +43,6 @@
 #define STD_CHRONO
 #endif
 
-#ifndef BOOST_TIMER_HPP
-#include <boost/timer.hpp>
-#define BOOST_TIMER_HPP
-#endif
-
 
 class ProgressMonitorBase
 {
@@ -57,6 +52,8 @@ public:
 };
 
 
+// Progress monitor with predetermined tick rate.
+//
 class ProgressMonitor : public ProgressMonitorBase
 {
 public:
@@ -112,6 +109,55 @@ private:
     const uint64_t mTick;
     const uint64_t mPrec;
 };
+
+
+// Progress monitor which trusts the tick method to be correct.
+//
+class ProgressMonitorFixed : public ProgressMonitorBase
+{
+public:
+    template <typename Actor>
+    void tick(uint64_t pX, Actor& pAct)
+    {
+        double n = mN;
+        double p = 100 * pX / n;
+        log(p);
+        pAct();
+    }
+
+    void tick(uint64_t pX)
+    {
+        double n = mN;
+        double p = 100 * pX / n;
+        log(p);
+    }
+
+    void end()
+    {
+        double p = 100;
+        log(p);
+    }
+
+    ProgressMonitorFixed(Logger& pLog, uint64_t pN, uint64_t pLikelyDelta)
+        : mLog(pLog), mN(pN + 1),
+          mPrec(std::max(0.0, (double)std::ceil(std::log10((long double)mN / pLikelyDelta)) - 2))
+    {
+    }
+
+private:
+
+    void log(double p)
+    {
+        std::stringstream ss;
+        ss << std::fixed << std::setprecision(mPrec) << p << '%';
+        mLog(info, ss.str());
+    }
+
+    Logger& mLog;
+    const uint64_t mN;
+    const uint64_t mPrec;
+};
+
 
 
 // Experimental progress monior which attempts to find the correct
@@ -205,21 +251,21 @@ public:
     void tick(uint64_t pX, Actor& pAct)
     {
         mX = pX;
-        if (timeToReport())
+        if (!mUpdateTime || timeToReport())
         {
             report();
             pAct();
-            recalculateNext();
+            if (mUpdateTime) recalculateNext();
         }
     }
     
     void tick(uint64_t pX)
     {
         mX = pX;
-        if (timeToReport())
+        if (!mUpdateTime || timeToReport())
         {
             report();
-            recalculateNext();
+            if (mUpdateTime) recalculateNext();
         }
     }
 

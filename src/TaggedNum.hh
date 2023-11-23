@@ -72,12 +72,12 @@ public:
     }
 
     TaggedNum()
-        : mValue(value_param_type())
+        : mValue(value_type())
     {
     }
 
-    explicit TaggedNum(value_param_type pValue)
-        : mValue(pValue)
+    explicit TaggedNum(value_type pValue)
+        : mValue(std::move(pValue))
     {
     }
 

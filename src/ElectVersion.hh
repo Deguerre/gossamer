@@ -16,8 +16,8 @@
 
 namespace Gossamer
 {
-    const char* version = "1.0.0";
-    uint64_t versionNumber = 0x001000000; // MMMmmmppp
+    const char* version = "1.0.1-dev";
+    uint64_t versionNumber = 0x001000001; // MMMmmmppp
 } // namespace Gossamer
 
 #endif // ELECTVERSION_HH

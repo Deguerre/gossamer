@@ -1055,8 +1055,8 @@ GossCmdFactoryGroupReads::create(App& pApp, const boost::program_options::variab
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdGroupReads(in, fastas, fastqs, lines, pairs, M, T, 
-                                            lhsName, rhsName, prefix, noOut, ord));
+    return make_goss_cmd<GossCmdGroupReads>(in, fastas, fastqs, lines, pairs, M, T,
+                                            lhsName, rhsName, prefix, noOut, ord);
 }
 
 GossCmdFactoryGroupReads::GossCmdFactoryGroupReads()

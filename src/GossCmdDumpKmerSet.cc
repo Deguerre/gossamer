@@ -69,7 +69,7 @@ GossCmdFactoryDumpKmerSet::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdDumpKmerSet(in, out));
+    return make_goss_cmd<GossCmdDumpKmerSet>(in, out);
 }
 
 GossCmdFactoryDumpKmerSet::GossCmdFactoryDumpKmerSet()

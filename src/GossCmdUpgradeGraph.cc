@@ -159,7 +159,7 @@ GossCmdFactoryUpgradeGraph::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdUpgradeGraph(in));
+    return make_goss_cmd<GossCmdUpgradeGraph>(in);
 }
 
 GossCmdFactoryUpgradeGraph::GossCmdFactoryUpgradeGraph()

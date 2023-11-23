@@ -188,13 +188,27 @@ BOOST_AUTO_TEST_CASE(test5)
 
     WordyBitVector v("v", fac);
 
-    WordyBitVector::Iterator1 itr = v.iterator1();
-    for (uint64_t i = 0; i < ones.size(); ++i, ++itr)
     {
-        BOOST_CHECK(itr.valid());
-        BOOST_CHECK_EQUAL(*itr, ones[i]);
+        WordyBitVector::Iterator1 itr = v.iterator1();
+        for (uint64_t i = 0; i < ones.size(); ++i, ++itr)
+        {
+            BOOST_CHECK(itr.valid());
+            BOOST_CHECK_EQUAL(*itr, ones[i]);
+        }
+        BOOST_CHECK(!itr.valid());
     }
-    BOOST_CHECK(!itr.valid());
+    {
+        WordyBitVector::Iterator1 itr = v.iterator1();
+        for (uint64_t i = 0; i + 1 < ones.size(); ++i)
+        {
+            itr.setPosition(ones[i]);
+            BOOST_CHECK(itr.valid());
+            BOOST_CHECK_EQUAL(*itr, ones[i]);
+            ++itr;
+            BOOST_CHECK(itr.valid());
+            BOOST_CHECK_EQUAL(*itr, ones[i+1]);
+        }
+    }
 }
 #endif
 

@@ -19,11 +19,6 @@
 #define STD_BITSET
 #endif
 
-#ifndef BOOST_STATIC_ASSERT_HPP
-#include <boost/static_assert.hpp>
-#define BOOST_STATIC_ASSERT_HPP
-#endif
-
 #ifndef BOOST_DYNAMIC_BITSET_HPP
 #include <boost/dynamic_bitset.hpp>
 #define BOOST_DYNAMIC_BITSET_HPP
@@ -109,8 +104,7 @@ public:
 
         std::bitset<kLastFlag> flags;
 
-        uint64_t indexArrayOffset;
-        uint64_t rankArrayOffset;
+        uint64_t indexRankArrayOffset;
 
         // The tuning constants
         uint64_t logBlockSize; // Log of number of 1's per block
@@ -123,7 +117,7 @@ public:
                             // which should be close to count() /  blockSize.
                             // It should also be equal to
                             // smallBlocks + intermediateBlocks + largeBlocks.
-        uint64_t indexSize; // Size of master index, in bytes.
+        uint64_t indexRankSize; // Size of master index/rank array, in bytes.
         uint64_t smallBlocks; // Number of small blocks.
         uint64_t smallBlocksSize; // Size of small blocks, in bytes.
         uint64_t intermediateBlocks; // Number of intermediate blocks.
@@ -161,8 +155,7 @@ public:
         Header mHeader;
 
         std::vector<uint64_t> mCurrBlock;
-        std::vector<uint64_t> mIndex;
-        std::vector<uint64_t> mRank;
+        std::vector<uint64_t> mIndexRank;
         std::vector<uint64_t> mSubRankStart;
         std::vector<uint64_t> mSubBlockRange;
         std::vector<uint16_t> mInternalPtr;
@@ -179,6 +172,8 @@ public:
     uint64_t select(uint64_t i) const;
 
     std::pair<uint64_t,uint64_t> select(uint64_t i, uint64_t j) const;
+
+    void prepopulate() const;
 
     DenseSelect(const WordyBitVector& pBitVector,
                 const std::string& pBaseName, FileFactory& pFactory,
@@ -202,17 +197,17 @@ protected:
     FileFactory::MappedHolderPtr mFileHolder;
     Header mHeader;
     const uint8_t* mData;
-    const uint64_t* mIndex;
-    const uint64_t* mRank;
+    const uint64_t* mIndexRank;
 };
 
 
 class DenseRank
 {
 public:
-    static const uint64_t version = 2011071201ULL;
+    static const uint64_t version = 2023071901ULL;
     // Version history
-    // 2011071201L   - first version
+    // 2011071201   - first version
+    // 2023071901   - Unified index and rank
 
     typedef uint16_t small_offset_t;
 

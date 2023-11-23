@@ -108,7 +108,7 @@ GossCmdFactorySubtractKmerSet::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdSubtractKmerSet(ins, out));
+    return make_goss_cmd<GossCmdSubtractKmerSet>(ins, out);
 }
 
 GossCmdFactorySubtractKmerSet::GossCmdFactorySubtractKmerSet()

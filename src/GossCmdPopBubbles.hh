@@ -19,12 +19,12 @@ public:
     void operator()(const GossCmdContext& pCxt);
 
     GossCmdPopBubbles(const std::string& pIn, const std::string& pOut,
-                      const boost::optional<uint64_t>& pNumThreads,
-                      const boost::optional<uint64_t>& pMaxSequenceLength,
-                      const boost::optional<uint64_t>& pMaxEditDistance,
-                      const boost::optional<double>& pMaxRelativeErrors,
-                      const boost::optional<uint64_t>& pCutoff,
-                      const boost::optional<double>& pRelCutoff)
+                      const std::optional<uint64_t>& pNumThreads,
+                      const std::optional<uint64_t>& pMaxSequenceLength,
+                      const std::optional<uint64_t>& pMaxEditDistance,
+                      const std::optional<double>& pMaxRelativeErrors,
+                      const std::optional<uint64_t>& pCutoff,
+                      const std::optional<double>& pRelCutoff)
         : mIn(pIn), mOut(pOut),
           mNumThreads(pNumThreads),
           mMaxSequenceLength(pMaxSequenceLength),
@@ -37,12 +37,12 @@ public:
 private:
     const std::string mIn;
     const std::string mOut;
-    boost::optional<uint64_t> mNumThreads;
-    boost::optional<uint64_t> mMaxSequenceLength;
-    boost::optional<uint64_t> mMaxEditDistance;
-    boost::optional<double> mMaxRelativeErrors;
-    boost::optional<uint64_t> mCutoff;
-    boost::optional<double> mRelCutoff;
+    std::optional<uint64_t> mNumThreads;
+    std::optional<uint64_t> mMaxSequenceLength;
+    std::optional<uint64_t> mMaxEditDistance;
+    std::optional<double> mMaxRelativeErrors;
+    std::optional<uint64_t> mCutoff;
+    std::optional<double> mRelCutoff;
 };
 
 

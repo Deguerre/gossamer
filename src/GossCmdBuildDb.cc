@@ -787,10 +787,10 @@ GossCmdFactoryBuildDb::create(App& pApp, const variables_map& pOpts)
 
     chk.throwIfNecessary(pApp);
 
-    return GossCmdPtr(new GossCmdBuildDb(in, db, reset, incGraph,
+    return make_goss_cmd<GossCmdBuildDb>(in, db, reset, incGraph,
 			    fastas, fastqs, lines,
 			    inferCoverage, expectedCoverage, expectedSize, stdDevFactor,
-			    tolerance, o, T, cr, estimateOnly));
+			    tolerance, o, T, cr, estimateOnly);
 }
 
 GossCmdFactoryBuildDb::GossCmdFactoryBuildDb()

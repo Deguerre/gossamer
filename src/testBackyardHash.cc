@@ -23,7 +23,35 @@ using namespace std;
 #define GOSS_TEST_MODULE TestBackyardHash
 #include "testBegin.hh"
 
-/*
+
+
+BOOST_AUTO_TEST_CASE(test_count)
+{
+    BackyardHash h(8, 40, (1ULL << 8) + (1ULL << 7));
+    const uint64_t M = (1ULL << 40) - 1;
+
+    const uint64_t COUNT = 65537;
+    std::mt19937 rng(17);
+    std::uniform_int_distribution<uint64_t> d(0, M);
+    auto value = BackyardHash::value_type(d(rng));
+
+    for (uint64_t i = 0; i < COUNT; ++i)
+    {
+        h.insert(value);
+        BOOST_ASSERT(!h.spills());
+    }
+
+    vector<uint32_t> perm;
+
+    h.sort(perm, 1);
+    for (auto p : perm) {
+        pair<Gossamer::edge_type, uint64_t> itm = h[p];
+        BOOST_ASSERT(itm.first == value);
+        BOOST_ASSERT(itm.second == COUNT);
+    }
+}
+
+
 BOOST_AUTO_TEST_CASE(testMutant)
 {
     Gossamer::edge_type v(42377831217986774ULL);
@@ -33,6 +61,7 @@ BOOST_AUTO_TEST_CASE(testMutant)
     x.insert(v);
     BOOST_CHECK_EQUAL(x.count(v), 2);
 }
+
 
 BOOST_AUTO_TEST_CASE(test1)
 {
@@ -93,6 +122,7 @@ BOOST_AUTO_TEST_CASE(test4)
     }
 }
 
+#if 0
 BOOST_AUTO_TEST_CASE(test5)
 {
     std::mt19937 rng(19);
@@ -116,16 +146,23 @@ BOOST_AUTO_TEST_CASE(test5)
     for (map<Gossamer::edge_type,uint64_t>::const_iterator j = m.begin(); j != m.end(); ++j, ++i)
     {
         BOOST_CHECK_EQUAL(j->first, x[perm[i]].first);
+        if (j->first != x[perm[i]].first) {
+            std::cerr << "Problem at " << i << " first\n";
+        }
         BOOST_CHECK_EQUAL(j->second, x[perm[i]].second);
+        if (j->second != x[perm[i]].second) {
+            std::cerr << "Problem at " << i << " second: " << j->second << " vs " << x[perm[i]].second << "\n";
+        }
     }
 }
-*/
+#endif
+
 
 BOOST_AUTO_TEST_CASE(test6)
 {
     const uint64_t M = (1ULL << 40) - 1;
     std::mt19937 rng(17);
-    std::uniform_int_distribution<uint64_t> d(0, M);;
+    std::uniform_int_distribution<uint64_t> d(0, M);
 
     BackyardHash h(16, 40, (1ULL << 16) + (1ULL << 15));
 
@@ -320,5 +357,6 @@ BOOST_AUTO_TEST_CASE(test7)
         prev = itm;
     }
 }
+
 
 #include "testEnd.hh"

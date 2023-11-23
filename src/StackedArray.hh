@@ -51,13 +51,20 @@ struct StackedArrayTraits<uint8_t>
     static uint64_t upper_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pVal)
     {
         const value_type* u = pArray.begin();
-        return Gossamer::upper_bound(u + pBegin, u + pEnd, pVal) - u;
+        return Gossamer::upper_bound_on_pointers(u + pBegin, u + pEnd, pVal) - u;
     }
 
     static uint64_t lower_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pVal)
     {
         const value_type* u = pArray.begin();
-        return Gossamer::lower_bound(u + pBegin, u + pEnd, pVal) - u;
+        return Gossamer::lower_bound_on_pointers(u + pBegin, u + pEnd, pVal) - u;
+    }
+
+    static std::pair<uint64_t, uint64_t> lower_and_upper_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pLwr, const value_type& pUpr)
+    {
+        const value_type* u = pArray.begin();
+        auto r = Gossamer::lower_and_upper_bound_on_pointers<value_type>(u + pBegin, u + pEnd, pLwr, pUpr);
+        return std::pair<uint64_t, uint64_t>(r.first - u, r.second - u);
     }
 };
 
@@ -76,13 +83,20 @@ struct StackedArrayTraits<uint16_t>
     static uint64_t upper_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pVal)
     {
         const value_type* u = pArray.begin();
-        return Gossamer::upper_bound(u + pBegin, u + pEnd, pVal) - u;
+        return Gossamer::upper_bound_on_pointers(u + pBegin, u + pEnd, pVal) - u;
     }
 
     static uint64_t lower_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pVal)
     {
         const value_type* u = pArray.begin();
-        return Gossamer::lower_bound(u + pBegin, u + pEnd, pVal) - u;
+        return Gossamer::lower_bound_on_pointers(u + pBegin, u + pEnd, pVal) - u;
+    }
+
+    static std::pair<uint64_t, uint64_t> lower_and_upper_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pLwr, const value_type& pUpr)
+    {
+        const value_type* u = pArray.begin();
+        auto r = Gossamer::lower_and_upper_bound_on_pointers<value_type>(u + pBegin, u + pEnd, pLwr, pUpr);
+        return std::pair<uint64_t, uint64_t>(r.first - u, r.second - u);
     }
 };
 
@@ -101,13 +115,20 @@ struct StackedArrayTraits<uint32_t>
     static uint64_t upper_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pVal)
     {
         const value_type* u = pArray.begin();
-        return Gossamer::upper_bound(u + pBegin, u + pEnd, pVal) - u;
+        return Gossamer::tuned_upper_bound(u + pBegin, u + pEnd, pVal) - u;
     }
 
     static uint64_t lower_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pVal)
     {
         const value_type* u = pArray.begin();
-        return Gossamer::lower_bound(u + pBegin, u + pEnd, pVal) - u;
+        return Gossamer::lower_bound_on_pointers(u + pBegin, u + pEnd, pVal) - u;
+    }
+
+    static std::pair<uint64_t, uint64_t> lower_and_upper_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pLwr, const value_type& pUpr)
+    {
+        const value_type* u = pArray.begin();
+        auto r = Gossamer::lower_and_upper_bound_on_pointers<value_type>(u + pBegin, u + pEnd, pLwr, pUpr);
+        return std::pair<uint64_t, uint64_t>(r.first - u, r.second - u);
     }
 };
 
@@ -126,13 +147,20 @@ struct StackedArrayTraits<uint64_t>
     static uint64_t upper_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pVal)
     {
         const value_type* u = pArray.begin();
-        return Gossamer::upper_bound(u + pBegin, u + pEnd, pVal) - u;
+        return Gossamer::upper_bound_on_pointers(u + pBegin, u + pEnd, pVal) - u;
     }
 
     static uint64_t lower_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pVal)
     {
         const value_type* u = pArray.begin();
-        return Gossamer::lower_bound(u + pBegin, u + pEnd, pVal) - u;
+        return Gossamer::lower_bound_on_pointers(u + pBegin, u + pEnd, pVal) - u;
+    }
+
+    static std::pair<uint64_t, uint64_t> lower_and_upper_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pLwr, const value_type& pUpr)
+    {
+        const value_type* u = pArray.begin();
+        auto r = Gossamer::lower_and_upper_bound_on_pointers<value_type>(u + pBegin, u + pEnd, pLwr, pUpr);
+        return std::pair<uint64_t, uint64_t>(r.first - u, r.second - u);
     }
 };
 
@@ -228,9 +256,8 @@ public:
         upr >>= lwrBits;
         typename LwrTraits::value_type lwrVal = LwrTraits::extract(pVal);
         typename UprTraits::value_type uprVal = UprTraits::extract(upr);
-        pBegin = UprTraits::lower_bound(mUpr, pBegin, pEnd, uprVal);
-        pEnd = UprTraits::upper_bound(mUpr, pBegin, pEnd, uprVal);
-        return LwrTraits::lower_bound(mLwr, pBegin, pEnd, lwrVal);
+        auto r = UprTraits::lower_and_upper_bound(mUpr, pBegin, pEnd, uprVal, uprVal);
+        return LwrTraits::lower_bound(mLwr, r.first, r.second, lwrVal);
     }
 
     uint64_t upper_bound(uint64_t pBegin, uint64_t pEnd, const integer_type& pVal) const
@@ -239,10 +266,18 @@ public:
         upr >>= lwrBits;
         typename LwrTraits::value_type lwrVal = LwrTraits::extract(pVal);
         typename UprTraits::value_type uprVal = UprTraits::extract(upr);
-        pBegin = UprTraits::lower_bound(mUpr, pBegin, pEnd, uprVal);
-        pEnd = UprTraits::upper_bound(mUpr, pBegin, pEnd, uprVal);
-        return LwrTraits::upper_bound(mLwr, pBegin, pEnd, lwrVal);
+        auto r = UprTraits::lower_and_upper_bound(mUpr, pBegin, pEnd, uprVal, uprVal);
+        return LwrTraits::upper_bound(mLwr, r.first, r.second, lwrVal);
     }
+
+    std::pair<uint64_t,uint64_t> lower_and_upper_bound(uint64_t pBegin, uint64_t pEnd, const integer_type& pLwr, const integer_type& pUpr) const
+    {
+        return std::pair<uint64_t, uint64_t>(
+            lower_bound(pBegin, pEnd, pLwr),
+            upper_bound(pBegin, pEnd, pUpr)
+        );
+    }
+
 
     StackedArray(const std::string& pBaseName, FileFactory& pFactory)
         : mUpr(pBaseName + ".upr", pFactory),
@@ -277,6 +312,11 @@ struct StackedArrayTraits<StackedArray<Upr,Lwr> >
     static uint64_t lower_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pVal)
     {
         return pArray.lower_bound(pBegin, pEnd, pVal);
+    }
+
+    static std::pair<uint64_t,uint64_t> lower_and_upper_bound(const array_type& pArray, uint64_t pBegin, uint64_t pEnd, const value_type& pLwr, const value_type& pUpr)
+    {
+        return pArray.lower_and_upper_bound(pBegin, pEnd, pLwr, pUpr);
     }
 };
 
