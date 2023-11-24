@@ -69,7 +69,7 @@ BOOST_AUTO_TEST_CASE(test1)
         for (uint64_t i = 0; i < items.size(); ++i)
         {
             const Item& item(items[i]);
-            EdgeAndCountCodec::encode(out, prev, item);
+            EdgeCodec<Gossamer::EdgeAndCount>::encode(out, prev, item);
             prev = item.first;
         }
     }
@@ -81,12 +81,50 @@ BOOST_AUTO_TEST_CASE(test1)
 
         for (uint64_t i = 0; i < items.size(); ++i)
         {
-            EdgeAndCountCodec::decode(in, item);
+            EdgeCodec<Gossamer::EdgeAndCount>::decode(in, item);
             BOOST_ASSERT(item.first == items[i].first);
             BOOST_ASSERT(item.second == items[i].second);
         }
  
     }
 }
+
+
+BOOST_AUTO_TEST_CASE(test2)
+{
+    typedef Gossamer::position_type Item;
+    vector<Item> items;
+
+    items.push_back(Item(parse("AAAAAAAAAAAAAAAAAAAAAACTTTTTTTTTTTACGTGAAGGGAACGTTCATAGG")));
+    items.push_back(Item(parse("AAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAAAAAAGAAAAGAAAAAAAAAGAAA")));
+
+    StringFileFactory fac;
+    {
+        FileFactory::OutHolderPtr outP(fac.out("tmp"));
+        ostream& out(**outP);
+
+        position_type prev(0ULL);
+        for (uint64_t i = 0; i < items.size(); ++i)
+        {
+            const Item& item(items[i]);
+            EdgeCodec<Gossamer::position_type>::encode(out, prev, item);
+            prev = item;
+        }
+    }
+
+    {
+        FileFactory::InHolderPtr inP(fac.in("tmp"));
+        istream& in(**inP);
+        position_type item;
+
+        for (uint64_t i = 0; i < items.size(); ++i)
+        {
+            EdgeCodec<Gossamer::position_type>::decode(in, item);
+            BOOST_CHECK_EQUAL(item, items[i]);
+        }
+
+    }
+}
+
 
 #include "testEnd.hh"

@@ -17,8 +17,13 @@
 #endif
 
 namespace Gossamer {
+	namespace simd {
 		typedef __m128i int128;
 		inline int128 zero_128() { return _mm_set_epi64x(0, 0); }
+
+		inline int128 load_64(uint64_t x) {
+			return _mm_set_epi64x(0, x);
+		}
 
 		inline int128 load_aligned_128(const void* ptr) {
 			return _mm_load_si128((const __m128i*)ptr);
@@ -59,7 +64,7 @@ namespace Gossamer {
 			return byte_reverse_128(x4);
 		}
 #endif
-
+	}
 }
 
 

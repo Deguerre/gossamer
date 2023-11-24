@@ -39,6 +39,10 @@
 #define BOOST_NUMERIC_CONVERSION_CAST_HPP
 #endif
 
+
+#undef GOSS_SPARSE_ARRAY_RUNTIME_CHECKS
+
+
 class SparseArray
 {
 public:
@@ -112,7 +116,9 @@ public:
             IntegerArray::value_type l = (pBitPos & mHeader.DMask).value();
             mLowBitsFile.push_back(l);
 
+#ifdef GOSS_SPARSE_ARRAY_RUNTIME_CHECKS
             BOOST_ASSERT(pBitPos >= mHeader.size);
+#endif
             mHeader.size = pBitPos + 1;
             ++mHeader.count;
         }
@@ -168,12 +174,16 @@ public:
 
         void operator++()
         {
+#ifdef GOSS_SPARSE_ARRAY_RUNTIME_CHECKS
             BOOST_ASSERT(mHiItr.valid());
             BOOST_ASSERT(valid());
+#endif
             ++mHiItr;
             if (++mI == mArray->count())
             {
+#ifdef GOSS_SPARSE_ARRAY_RUNTIME_CHECKS
                 BOOST_ASSERT(!mHiItr.valid());
+#endif
                 mValid = false;
                 return;
             }
@@ -196,7 +206,9 @@ public:
     public:
         bool valid() const
         {
+#ifdef GOSS_SPARSE_ARRAY_RUNTIME_CHECKS
             BOOST_ASSERT(mHiItr.valid() == mLowBitsIterator.valid());
+#endif
             return mHiItr.valid();
         }
 
@@ -210,9 +222,11 @@ public:
 
         void operator++()
         {
+#ifdef GOSS_SPARSE_ARRAY_RUNTIME_CHECKS
             BOOST_ASSERT(mHiItr.valid());
             BOOST_ASSERT(mLowBitsIterator.valid());
             BOOST_ASSERT(valid());
+#endif
             ++mHiItr;
             ++mLowBitsIterator;
             ++mI;
@@ -262,7 +276,9 @@ public:
         uint64_t posD = (pPos >> mHeader.D).asUInt64();
 
         std::pair<uint64_t,uint64_t> xrange = findLowOrderGroup(posD);
+#ifdef GOSS_SPARSE_ARRAY_RUNTIME_CHECKS
         BOOST_ASSERT(xrange.second <= mLowBits.size());
+#endif
 
         position_type j = pPos & mHeader.DMask;
         uint64_t rank = searchLowBits(xrange.first, xrange.second, j);
@@ -278,7 +294,9 @@ public:
         uint64_t posD = (pPos >> mHeader.D).asUInt64();
 
         std::pair<uint64_t,uint64_t> xrange = findLowOrderGroup(posD);
+#ifdef GOSS_SPARSE_ARRAY_RUNTIME_CHECKS
         BOOST_ASSERT(xrange.second <= mLowBits.size());
+#endif
 
         position_type j = pPos & mHeader.DMask;
         pRank = searchLowBits(xrange.first, xrange.second, j);
@@ -293,7 +311,9 @@ public:
     {
         std::pair<rank_type,rank_type> retval;
 
+#ifdef GOSS_SPARSE_ARRAY_RUNTIME_CHECKS
         BOOST_ASSERT(pLhs <= pRhs);
+#endif
 
         uint64_t posDlhs = (pLhs >> mHeader.D).asUInt64();
         uint64_t posDrhs = (pRhs >> mHeader.D).asUInt64();
@@ -306,7 +326,9 @@ public:
         }
 
         std::pair<uint64_t,uint64_t> xrange = findLowOrderGroup(posDlhs);
+#ifdef GOSS_SPARSE_ARRAY_RUNTIME_CHECKS
         BOOST_ASSERT(xrange.second <= mLowBits.size());
+#endif
 
         uint64_t firstRank = searchLowBits(xrange.first, xrange.second, pLhs & mHeader.DMask);
         retval.first = firstRank;
@@ -326,7 +348,9 @@ public:
         uint64_t posD = (pPos >> mHeader.D).asUInt64();
 
         std::pair<uint64_t,uint64_t> xrange = findLowOrderGroup(posD);
+#ifdef GOSS_SPARSE_ARRAY_RUNTIME_CHECKS
         BOOST_ASSERT(xrange.second <= mLowBits.size());
+#endif
 
         position_type j = pPos & mHeader.DMask;
         return searchLowBits(xrange.first, xrange.second, j);
@@ -334,7 +358,9 @@ public:
 
     position_type select(rank_type pRnk) const
     {
+#ifdef GOSS_SPARSE_ARRAY_RUNTIME_CHECKS
         BOOST_ASSERT(pRnk < mHeader.count);
+#endif
 
         position_type pos(0);
         if (mHeader.D < position_type::value_type::sBits)

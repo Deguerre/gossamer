@@ -34,6 +34,7 @@ using namespace std;
 
 
 namespace {
+    static bool sAssumeCommonSetIsTiny = true;
     static bool sEstimateGraphStatistics = true;
 }
 
@@ -59,7 +60,20 @@ GossCmdMergeAndAnnotateKmerSets::operator()(const GossCmdContext& pCxt)
     }
 
 	uint64_t n = 0, c = 0;
-	if (sEstimateGraphStatistics) {
+
+    if (sAssumeCommonSetIsTiny) {
+        // Use 99% confidence interval
+        auto [wmin, wmax] = Gossamer::binomialConfidenceInterval(0, 65536, 2.58);
+        auto size = std::min(lhs.count(), rhs.count());
+        auto cmin = wmin * size;
+        auto nmin = lhs.count() + rhs.count() - cmin;
+        auto cmax = wmax * size;
+        auto nmax = lhs.count() + rhs.count() - cmax;
+        c = (uint64_t)(wmax * size);
+        n = lhs.count() + rhs.count() - c;
+        log(info, "Estimating that " + lexical_cast<string>(c) + " kmers are common, total of " + lexical_cast<string>(n) + " kmers");
+    }
+    else if (sEstimateGraphStatistics) {
 		// Estimate the number of common kmers between the two sets.
 
 		log(info, "Estimating kmer statistics");

@@ -37,6 +37,11 @@
 #include "BackgroundBlockConsumer.hh"
 #endif
 
+#ifndef EDGEANDCOUNT_HH
+#include "EdgeAndCount.hh"
+#endif
+
+
 #ifndef PROPERTIES_HH
 #include "Properties.hh"
 #endif
@@ -103,6 +108,11 @@ public:
             mEdgesBuilderBackground.push_back(pEdge);
             mCountsBuilderBackground.push_back(pCount);
             ++mHist[pCount];
+        }
+
+        void push_back(const Gossamer::EdgeAndCount& pEdgeAndCount)
+        {
+            push_back(pEdgeAndCount.first, pEdgeAndCount.second);
         }
 
         void end();

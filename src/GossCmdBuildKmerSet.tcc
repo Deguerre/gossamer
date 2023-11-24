@@ -90,11 +90,10 @@ namespace {
         class Builder
         {
         public:
-            void push_back(const Gossamer::position_type& pEdge, const uint64_t& pCount)
+            void push_back(const Gossamer::position_type& pEdge)
             {
-                Gossamer::EdgeAndCount itm(pEdge, pCount);
-                EdgeAndCountCodec::encode(mOut, mPrevEdge, itm);
-                mPrevEdge = itm.first;
+                EdgeCodec<Gossamer::position_type>::encode(mOut, mPrevEdge, pEdge);
+                mPrevEdge = pEdge;
             }
 
             void end()
@@ -150,7 +149,7 @@ namespace {
         }
 
         uint32_t n = 0;
-        std::pair<Gossamer::edge_type,uint64_t> prev(*heap[0]->ii, 0);
+        auto prev = *heap[0]->ii;
 
         auto check_heap = [&]() {
             for (int i = 1; i < entries; ++i) {
@@ -166,8 +165,7 @@ namespace {
             NakedGraph::Builder bld(pGraphName, pFactory);
             while (entries) {
 
-                while (!heap[0]->empty() && *heap[0]->ii == prev.first) {
-                    ++prev.second;
+                while (!heap[0]->empty() && *heap[0]->ii == prev) {
                     ++heap[0]->ii;
                 }
 
@@ -224,21 +222,16 @@ namespace {
 
                 if (!down_heap_worked) {
                     // We must have exhausted this entry.
-                    bld.push_back(prev.first, prev.second);
+                    bld.push_back(prev);
                     ++n;
                     if (entries) {
-                        BOOST_ASSERT(prev.first < *heap[0]->ii);
-                        prev.first = *heap[0]->ii;
-                        prev.second = 0;
+                        BOOST_ASSERT(prev < *heap[0]->ii);
+                        prev = *heap[0]->ii;
                         // check_heap();
                     }
                 }
             }
-            if (prev.second > 0) {
-                bld.push_back(prev.first, prev.second);
-                ++n;
-            }
-
+            bld.push_back(prev);
         }
         catch (std::ios_base::failure& e)
         {
@@ -270,26 +263,25 @@ namespace {
                 // since it is *possible* for the BackyardHash
                 // to contain duplicates.
 
-                std::pair<Gossamer::edge_type,uint64_t> prev = pHash[perm[0]];
+                auto prev = pHash[perm[0]].first;
                 for (uint32_t i = 1; i < permsize ; ++i)
                 {
-                    std::pair<Gossamer::edge_type,uint64_t> itm = pHash[perm[i]];
-                    //cerr << "edge: " << itm.first.value() << ", count: " << itm.second << '\n';
-                    if ((itm.first < prev.first))
+                    auto itm = pHash[perm[i]].first;
+                    //cerr << "edge: " << itm.value() << '\n';
+                    if (itm < prev)
                     {
                         std::cerr << "ERROR! Edges out of order\n";
                     }
 
-                    if (itm.first == prev.first)
+                    if (itm == prev)
                     {
-                        prev.second += itm.second;
                         continue;
                     }
-                    bld.push_back(prev.first, prev.second);
+                    bld.push_back(prev);
                     ++n;
                     prev = itm;
                 }
-                bld.push_back(prev.first, prev.second);
+                bld.push_back(prev);
                 ++n;
             }
             bld.end();
@@ -320,25 +312,24 @@ namespace {
                 // Keep track of the previous edge/count pair,
                 // since it is *possible* for the BackyardHash
                 // to contain duplicates.
-                std::pair<Gossamer::edge_type,std::uint64_t> prev = pHash[perm[0]];
+                auto prev = pHash[perm[0]].first;
                 for (uint32_t i = 1; i < perm.size(); ++i)
                 {
-                    std::pair<Gossamer::edge_type,uint64_t> itm = pHash[perm[i]];
-                    //cerr << "edge: " << itm.first.value() << ", count: " << itm.second << '\n';
-                    if ((itm.first < prev.first))
+                    auto itm = pHash[perm[i]].first;
+                    //cerr << "edge: " << itm.value() << '\n';
+                    if (itm < prev)
                     {
                         std::cerr << "ERROR! Edges out of order\n";
                     }
 
-                    if (itm.first == prev.first)
+                    if (itm == prev)
                     {
-                        prev.second += itm.second;
                         continue;
                     }
-                    bld.push_back(Gossamer::edge_type(prev.first), prev.second);
+                    bld.push_back(Gossamer::edge_type(prev));
                     prev = itm;
                 }
-                bld.push_back(Gossamer::edge_type(prev.first), prev.second);
+                bld.push_back(Gossamer::edge_type(prev));
             }
             bld.end();
         }
@@ -464,7 +455,7 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
         
         log(info, "merging temporary graphs");
 
-        AsyncMerge::merge<KmerSet>(parts, sizes, mKmerSetName, mK, z, mT, 65536, fac);
+        AsyncMerge::merge<KmerSet,false>(parts, sizes, mKmerSetName, mK, z, mT, 65536, fac);
 
         for (uint64_t i = 0; i < parts.size(); ++i)
         {
@@ -518,6 +509,7 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
                     }
 
                     Gossamer::sortKmers(mK, *thisblk);
+                    Gossamer::uniqueAfterSort(*thisblk);
 
                     std::unique_lock<std::mutex> merge_lock(merge_mut);
                     merge_blocks.push_back(thisblk);
@@ -571,8 +563,8 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
     if (parts.size() > 0) {
         log(info, "merging temporary graphs");
 
-        uint64_t buffer_size = Gossamer::align_down(std::max<uint64_t>(mM * 0.1 / parts.size(), 65536), Gossamer::sPageAlignBits) / sizeof(Gossamer::EdgeAndCount);
-        AsyncMerge::merge<KmerSet>(parts, sizes, mKmerSetName, mK, z, mT, buffer_size, fac);
+        uint64_t buffer_size = Gossamer::align_down(std::max<uint64_t>(mM * 0.1 / parts.size(), 65536), Gossamer::sPageAlignBits) / sizeof(Gossamer::position_type);
+        AsyncMerge::merge<KmerSet,Gossamer::position_type>(parts, sizes, mKmerSetName, mK, z, mT, buffer_size, fac);
 
         for (uint64_t i = 0; i < parts.size(); ++i)
         {

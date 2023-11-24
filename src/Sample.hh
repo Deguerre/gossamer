@@ -13,11 +13,6 @@
 #define STD_RANDOM
 #endif
 
-#ifndef STD_ITERATOR
-#include <random>
-#define STD_ITERATOR
-#endif
-
 #ifndef UTILS_HH
 #include "Utils.hh"
 #endif
@@ -38,17 +33,17 @@ namespace Gossamer {
         case 1:
         {
             container.reserve(1);
-            std::uniform_int_distribution<uint64_t> unif(0, n);
+            std::uniform_int_distribution<uint64_t> unif(0, n-1);
             container.push_back(unif(rng));
             return;
         }
         case 2:
         {
             container.reserve(2);
-            std::uniform_int_distribution<uint64_t> unif1(0, n);
-            uint64_t x1 = n * unif1(rng);
-            std::uniform_int_distribution<uint64_t> unif2(0, n - 1);
-            uint64_t x2 = (n - 1) * unif2(rng);
+            std::uniform_int_distribution<uint64_t> unif1(0, n - 1);
+            uint64_t x1 = unif1(rng);
+            std::uniform_int_distribution<uint64_t> unif2(0, n - 2);
+            uint64_t x2 = unif2(rng);
             if (x1 == x2) x2 = n - 1;
             container.push_back(x1);
             container.push_back(x2);
@@ -67,7 +62,7 @@ namespace Gossamer {
         container.resize(containerBase + k);
 
         for (uint32_t i = 0; i < k; ++i) {
-            std::uniform_int_distribution<uint64_t> unif(0, n - i);
+            std::uniform_int_distribution<uint64_t> unif(0, n - i - 1);
             uint64_t j = unif(rng);
             uint64_t h;
             for (h = j & hashTableMask; ; h = (h + 1) & hashTableMask) {

@@ -2,6 +2,8 @@
 // Copyright (c) 2016, Commonwealth Scientific and Industrial Research
 // Organisation (CSIRO) ABN 41 687 119 230.
 //
+// Portions Copyright (c) 2023 Andrew J. Bromage.
+//
 // Licensed under the CSIRO Open Source Software License Agreement;
 // you may not use this file except in compliance with the License.
 // Please see the file LICENSE, included with this distribution.
@@ -17,6 +19,7 @@
 #include <deque>
 #include <boost/intrusive/list.hpp>
 #include "ThreadGroup.hh"
+#include "TrivialVector.hh"
 #include "Utils.hh"
 
 class WorkQueue : private boost::noncopyable
@@ -133,22 +136,19 @@ public:
           private boost::noncopyable
     {
         static constexpr unsigned sMaxSuccessors = 16;
-        Task* mSuccessors[sMaxSuccessors];
         WorkFunction mFunction;
+        TrivialVector<Task*, sMaxSuccessors> mSuccessors;
         std::atomic<uint32_t> mPredecessors = 1;
-        uint8_t mSuccessorCount = 0;
         enum class State { WAIT, READY, RUNNING, COMPLETE } mState = State::WAIT;
 
         void addSuccessor(Task* task)
         {
-            BOOST_ASSERT(mSuccessorCount + 1 < sMaxSuccessors);
-            mSuccessors[mSuccessorCount++] = task;
+            mSuccessors.push_back(task);
         }
 
         Task(const WorkFunction& pFunction)
             : mFunction(pFunction)
         {
-            std::memset(mSuccessors, 0, sizeof(mSuccessors));
         }
     };
 
@@ -165,77 +165,13 @@ private:
 
     ThreadGroup mThreads;
 
-    Task* waitUntilTaskIsAvailable()
-    {
-        std::unique_lock<std::mutex> lock(mMutex);
-        if (mReadyQueue.empty()) {
-            mCond.wait(lock, [&] { return !mReadyQueue.empty() || mFinished;  });
-        }
-        if (mReadyQueue.empty()) {
-            return 0;
-        }
-        auto task = &mReadyQueue.front();
-        mReadyQueue.pop_front();
-        return task;
-    }
-
-    Task* getAvailableTask()
-    {
-        std::unique_lock<std::mutex> lock(mMutex);
-        if (mReadyQueue.empty()) {
-            return 0;
-        }
-        auto task = &mReadyQueue.front();
-        task->unlink();
-        return task;
-    }
-
-    void workOnTask(Task* task)
-    {
-        {
-            std::unique_lock<std::mutex> lock(mMutex);
-            task->unlink();
-        }
-        task->mState = Task::State::RUNNING;
-        task->mFunction();
-        finishTask(task);
-    }
-
-    void helpWithWork()
-    {
-        auto task = getAvailableTask();
-        if (task) {
-            workOnTask(task);
-        }
-        else {
-            std::this_thread::yield();
-        }
-    }
-
-    void readyTask(Task* task)
-    {
-        task->mState = Task::State::READY;
-        std::unique_lock<std::mutex> lock(mMutex);
-        task->unlink();
-        mReadyQueue.push_back(*task);
-        mCond.notify_one();
-    }
-
-    void completeDependency(Task* task)
-    {
-        if (!--task->mPredecessors) {
-            readyTask(task);
-        }
-    }
-
-    void finishTask(Task* task)
-    {
-        task->mState = Task::State::COMPLETE;
-        for (auto i = 0; i < task->mSuccessorCount; ++i) {
-            completeDependency(task->mSuccessors[i]);
-        }
-    }
-
+    Task* waitUntilTaskIsAvailable();
+    Task* getAvailableTask();
+    void workOnTask(Task* task);
+    void helpWithWork();
+    void readyTask(Task* task);
+    void completeDependency(Task* task);
+    void finishTask(Task* task);
 
 public:
     Task* add(const WorkFunction& pFn)
@@ -275,31 +211,9 @@ public:
         mJoined = true;
     }
 
-    ComplexWorkQueue(uint64_t pNumThreads)
-        : mFinished(false), mJoined(false)
-    {
-        //std::cerr << "creating WorkQueue with " << pNumThreads << " threads." << std::endl;
-        for (uint64_t i = 0; i < pNumThreads; ++i)
-        {
-            mThreads.create([&]() {
-                while (!mFinished) {
-                    Task* task = waitUntilTaskIsAvailable();
-                    if (!task) {
-                        continue;
-                    }
-                    workOnTask(task);
-                }
-            });
-        }
-    }
+    ComplexWorkQueue(uint64_t pNumThreads);
 
-    ~ComplexWorkQueue()
-    {
-        if (!mJoined)
-        {
-            end();
-        }
-    }
+    ~ComplexWorkQueue();
 };
 
 

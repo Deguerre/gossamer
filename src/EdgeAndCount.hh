@@ -44,6 +44,41 @@
 namespace Gossamer
 {
     typedef std::pair<position_type,uint64_t> EdgeAndCount;
+
+
+    template<typename Item>
+    struct EdgeItemTraits
+    {
+    };
+
+    template<>
+    struct EdgeItemTraits<EdgeAndCount>
+    {
+        static inline void combine(EdgeAndCount& pLhs, const EdgeAndCount& pRhs)
+        {
+            pLhs.second += pRhs.second;
+        }
+
+        static inline const position_type& edge(const EdgeAndCount& pEC)
+        {
+            return pEC.first;
+        }
+    };
+
+    template<>
+    struct EdgeItemTraits<position_type>
+    {
+        static inline void combine(position_type& pLhs, const position_type& pRhs)
+        {
+        }
+
+        static inline const position_type& edge(const position_type& pEdge)
+        {
+            return pEdge;
+        }
+    };
+
+
 }
 // namespace Gossamer
 
@@ -75,9 +110,18 @@ namespace // anonymous
 }
 // namespace anonymous
 
-class EdgeAndCountCodec
+
+template<typename Item>
+struct EdgeCodec
 {
-public:
+    static void encode(std::ostream& pOut, const Gossamer::position_type& pPrevEdge, const Item& pItm);
+    static void decode(std::istream& pIn, Item& pItm);
+};
+
+
+template<>
+struct EdgeCodec<Gossamer::EdgeAndCount>
+{
         static void encode(std::ostream& pOut,
                            const Gossamer::position_type& pPrevEdge,
                            const Gossamer::EdgeAndCount& pItm)
@@ -110,5 +154,40 @@ public:
             pItm.second = VByteCodec::decode(adapter);
         }
 };
+
+template<>
+struct EdgeCodec<Gossamer::position_type>
+{
+    static void encode(std::ostream& pOut,
+        const Gossamer::position_type& pPrevEdge,
+        const Gossamer::position_type & pItm)
+    {
+        BOOST_ASSERT(pPrevEdge <= pItm);
+        TrivialVector<uint8_t, sizeof(Gossamer::position_type) * 9 / 8 + 1> v;
+        Gossamer::position_type::value_type d = pItm.value();
+        d -= pPrevEdge.value();
+
+        std::pair<const uint64_t*, const uint64_t*> ws = d.words();
+        for (const uint64_t* i = ws.first; i < ws.second; ++i)
+        {
+            VByteCodec::encode(*i, v);
+        }
+        pOut.write(reinterpret_cast<const char*>(&v[0]), v.size());
+    }
+
+    static void decode(std::istream& pIn, Gossamer::position_type& pItm)
+    {
+        InAdapter adapter(pIn);
+        Gossamer::position_type::value_type d = pItm.value();
+        std::pair<uint64_t*, uint64_t*> ws = d.words();
+        for (uint64_t* i = ws.first; i != ws.second; ++i)
+        {
+            *i = VByteCodec::decode(adapter);
+        }
+        d += pItm.value();
+        pItm = Gossamer::position_type(d);
+    }
+};
+
 
 #endif // EDGEANDCOUNT_HH

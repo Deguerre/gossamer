@@ -23,7 +23,7 @@ using namespace std;
 
 BOOST_AUTO_TEST_CASE(test1)
 {
-	ComplexWorkQueue wq(1);
+	ComplexWorkQueue wq(10);
 
 	auto startJob = wq.add([&] {
 		std::cerr << "Start job\n";

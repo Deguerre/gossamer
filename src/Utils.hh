@@ -545,11 +545,22 @@ ensureCapacity(Container& pContainer, uint64_t pNewElements = 1)
 //
 template<class Container>
 inline void
+uniqueAfterSort(Container& pContainer)
+{
+    pContainer.erase(std::unique(pContainer.begin(), pContainer.end()),
+        pContainer.end());
+}
+
+
+
+// Sort-and-unique a container.
+//
+template<class Container>
+inline void
 sortAndUnique(Container& pContainer)
 {
     std::sort(pContainer.begin(), pContainer.end());
-    pContainer.erase(std::unique(pContainer.begin(), pContainer.end()),
-            pContainer.end());
+    uniqueAfterSort(pContainer);
 }
 
 

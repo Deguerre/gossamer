@@ -46,7 +46,7 @@ void writeFile(const string& pFn, const vector<Gossamer::EdgeAndCount>& pItems, 
     Gossamer::position_type prev(0);
     for (uint64_t i = 0; i < pItems.size(); ++i)
     {
-        EdgeAndCountCodec::encode(out, prev, pItems[i]);
+        EdgeCodec<Gossamer::EdgeAndCount>::encode(out, prev, pItems[i]);
         prev = pItems[i].first;
     }
 }
@@ -66,7 +66,7 @@ BOOST_AUTO_TEST_CASE(test1)
         uint64_t i = 0;
         while (in.good())
         {
-            EdgeAndCountCodec::decode(in, itm);
+            EdgeCodec<Gossamer::EdgeAndCount>::decode(in, itm);
             if (!in.good())
             {
                 break;

@@ -44,6 +44,7 @@ ADD_LIBRARY(gosslib STATIC
 	VariableByteArray.cc
 	VariableWidthBitArray.cc
 	WordyBitVector.cc
+	WorkQueue.cc
 )
 
 TARGET_LINK_LIBRARIES(gosslib

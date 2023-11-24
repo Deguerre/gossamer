@@ -147,7 +147,7 @@ namespace // anonymous
             void push_back(const Gossamer::position_type& pEdge, const uint64_t& pCount)
             {
                 Gossamer::EdgeAndCount itm(pEdge, pCount);
-                EdgeAndCountCodec::encode(mOut, mPrevEdge, itm);
+                EdgeCodec<Gossamer::EdgeAndCount>::encode(mOut, mPrevEdge, itm);
                 mPrevEdge = itm.first;
             }
 

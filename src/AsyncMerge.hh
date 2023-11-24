@@ -21,7 +21,7 @@
 class AsyncMerge
 {
 public:
-    template <typename Kind>
+    template <typename Kind, typename Item = Gossamer::EdgeAndCount>
     static void merge(const std::vector<std::string>& pParts, const std::vector<uint64_t>& pSizes,
                       const std::string& pGraphName,
                       uint64_t pK, uint64_t pN, uint64_t pNumThreads, uint64_t pBufferSize,

@@ -295,12 +295,12 @@ public:
             return *this;
         }
 
-        if (Words == 1) {
+        if constexpr (Words == 1) {
             mImpl.mWords[0] <<= pShift;
             return *this;
         }
 
-        if (Words == 2) {
+        if constexpr (Words == 2) {
             auto x1 = mImpl.mWords[1];
             auto x0 = mImpl.mWords[0];
             if (pShift >= sBitsPerWord) {
@@ -340,12 +340,12 @@ public:
             return *this;
         }
 
-        if (Words == 1) {
+        if constexpr (Words == 1) {
             mImpl.mWords[0] >>= pShift;
             return *this;
         }
 
-        if (Words == 2) {
+        if constexpr (Words == 2) {
             auto x1 = mImpl.mWords[1];
             auto x0 = mImpl.mWords[0];
             if (pShift >= sBitsPerWord) {
