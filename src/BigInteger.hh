@@ -76,7 +76,7 @@ struct BigIntegerBase
 {
     typedef uint64_t word_type;
 #ifdef GOSS_HAVE_SIMD128
-    typedef Gossamer::int128 double_word_type;
+    typedef Gossamer::simd::int128 double_word_type;
 #endif
 
     typedef std::numeric_limits<word_type> word_type_limits;
@@ -226,10 +226,11 @@ public:
     void reverseComplement(uint64_t pK)
     {
 #ifdef GOSS_HAVE_REVERSE4_128
-        if (Words == 2) {
-            auto x = Gossamer::load_aligned_128(&mImpl.mWords[0]);
-            auto rc = Gossamer::reverse4_128(Gossamer::not_128(x));
-            Gossamer::store_aligned_128(&mImpl.mWords[0], rc);
+        if constexpr (Words == 2) {
+            using namespace Gossamer::simd;
+            auto x = load_aligned_128(&mImpl.mWords[0]);
+            auto rc = reverse4_128(not_128(x));
+            store_aligned_128(&mImpl.mWords[0], rc);
             *this >>= sBits - 2 * pK;
             return;
         }
@@ -267,6 +268,28 @@ public:
         return *this;
     }
 
+    // Optimised add-plus-1.
+    BigInteger& add1(uint64_t pRhs)
+    {
+        bool carry = Gossamer::add64(mImpl.mWords[0], pRhs, true, mImpl.mWords[0]);
+        Gossamer::unrolled_loop<int, Words - 1>([&](auto j) {
+            auto i = j + 1;
+            carry = Gossamer::add64(mImpl.mWords[i], 0, carry, mImpl.mWords[i]);
+        });
+        return *this;
+    }
+
+    // Optimised add-plus-1.
+    BigInteger& add1(const BigInteger& pRhs)
+    {
+        bool carry = Gossamer::add64(mImpl.mWords[0], pRhs.mImpl.mWords[0], true, mImpl.mWords[0]);
+        Gossamer::unrolled_loop<int, Words - 1>([&](auto j) {
+            auto i = j + 1;
+            carry = Gossamer::add64(mImpl.mWords[i], pRhs.mImpl.mWords[i], carry, mImpl.mWords[i]);
+            });
+        return *this;
+    }
+
     BigInteger& operator-=(uint64_t pRhs)
     {
         bool carry = Gossamer::sub64(mImpl.mWords[0], pRhs, false, mImpl.mWords[0]);
@@ -284,6 +307,17 @@ public:
             auto i = j + 1;
             carry = Gossamer::sub64(mImpl.mWords[i], pRhs.mImpl.mWords[i], carry, mImpl.mWords[i]);
         });
+        return *this;
+    }
+
+    // Optimised subtract-minus-1.
+    BigInteger& subtract1(const BigInteger& pRhs)
+    {
+        bool carry = Gossamer::sub64(mImpl.mWords[0], pRhs.mImpl.mWords[0], true, mImpl.mWords[0]);
+        Gossamer::unrolled_loop<int, Words - 1>([&](auto j) {
+            auto i = j + 1;
+            carry = Gossamer::sub64(mImpl.mWords[i], pRhs.mImpl.mWords[i], carry, mImpl.mWords[i]);
+            });
         return *this;
     }
 
@@ -386,6 +420,16 @@ public:
 
     BigInteger& operator|=(const BigInteger& pRhs)
     {
+#ifdef GOSS_HAVE_SIMD128
+        if constexpr (Words == 2) {
+            using namespace Gossamer::simd;
+            auto l = load_aligned_128(&mImpl.mWords[0]);
+            auto r = load_aligned_128(&pRhs.mImpl.mWords[0]);
+            store_aligned_128(&mImpl.mWords[0], or_128(l, r));
+            return *this;
+        }
+#endif
+
         Gossamer::unrolled_loop<int, Words>([&](auto i) {
             mImpl.mWords[i] |= pRhs.mImpl.mWords[i];
         });
@@ -407,6 +451,16 @@ public:
 
     BigInteger& operator&=(const BigInteger& pRhs)
     {
+#ifdef GOSS_HAVE_SIMD128
+        if constexpr (Words == 2) {
+            using namespace Gossamer::simd;
+            auto l = load_aligned_128(&mImpl.mWords[0]);
+            auto r = load_aligned_128(&pRhs.mImpl.mWords[0]);
+            store_aligned_128(&mImpl.mWords[0], and_128(l, r));
+            return *this;
+        }
+#endif
+
         Gossamer::unrolled_loop<int, Words>([&](auto i) {
             mImpl.mWords[i] &= pRhs.mImpl.mWords[i];
         });
@@ -415,6 +469,15 @@ public:
 
     BigInteger& operator^=(const BigInteger& pRhs)
     {
+#ifdef GOSS_HAVE_SIMD128
+        if constexpr (Words == 2) {
+            using namespace Gossamer::simd;
+            auto l = load_aligned_128(&mImpl.mWords[0]);
+            auto r = load_aligned_128(&pRhs.mImpl.mWords[0]);
+            store_aligned_128(&mImpl.mWords[0], xor_128(l, r));
+            return *this;
+        }
+#endif
         Gossamer::unrolled_loop<int, Words>([&](auto i) {
             mImpl.mWords[i] ^= pRhs.mImpl.mWords[i];
         });
@@ -424,6 +487,14 @@ public:
     BigInteger operator~()
     {
         BigInteger retval;
+#ifdef GOSS_HAVE_SIMD128
+        if constexpr (Words == 2) {
+            using namespace Gossamer::simd;
+            auto x = load_aligned_128(&mImpl.mWords[0]);
+            store_aligned_128(&retval.mImpl.mWords[0], not_128(x));
+            return retval;
+        }
+#endif
         Gossamer::unrolled_loop<int, Words>([&](auto i) {
             retval.mImpl.mWords[i] = ~mImpl.mWords[i];
         });
@@ -452,6 +523,7 @@ public:
 
     uint64_t log2() const
     {
+        // XXX TODO SIMD implementation
         for (int64_t i = Words - 1; i >= 0; --i)
         {
             if (mImpl.mWords[i])
@@ -483,16 +555,23 @@ public:
 
     bool operator<(const BigInteger& pRhs) const
     {
+        if constexpr (Words == 1) {
+            return mImpl.mWords[0] < pRhs.mImpl.mWords[0];
+        }
+
+        if constexpr (Words == 2) {
+            bool w1eq = mImpl.mWords[1] == pRhs.mImpl.mWords[1];
+            bool w1lt = mImpl.mWords[1] < pRhs.mImpl.mWords[1];
+            bool w0lt = mImpl.mWords[0] < pRhs.mImpl.mWords[0];
+            return w1lt || (w1eq && w0lt);
+        }
+
         for (int64_t i = Words-1; i >= 0; --i)
         {
-            if (mImpl.mWords[i] < pRhs.mImpl.mWords[i])
-            {
-                return true;
+            if (mImpl.mWords[i] == pRhs.mImpl.mWords[i]) {
+                continue;
             }
-            if (mImpl.mWords[i] > pRhs.mImpl.mWords[i])
-            {
-                return false;
-            }
+            return mImpl.mWords[i] < pRhs.mImpl.mWords[i];
         }
 
         return false;

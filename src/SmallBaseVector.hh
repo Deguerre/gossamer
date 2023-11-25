@@ -38,8 +38,8 @@
 #include "RankSelect.hh"
 #endif
 
-#ifndef VBYTECODEC_HH
-#include "VByteCodec.hh"
+#ifndef INTEGERCODECS_HH
+#include "IntegerCodecs.hh"
 #endif
 
 #ifndef BOOST_LEXICAL_CAST_HPP

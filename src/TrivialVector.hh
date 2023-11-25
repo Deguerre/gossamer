@@ -53,6 +53,11 @@ public:
         mItems[mSize++] = pItem;
     }
 
+    void resize(uint64_t size)
+    {
+        mSize = size;
+    }
+
     void clear()
     {
         mSize = 0;

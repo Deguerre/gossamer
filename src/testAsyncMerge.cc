@@ -10,6 +10,7 @@
 #include "EdgeAndCount.hh"
 #include "Graph.hh"
 #include "StringFileFactory.hh"
+#include "Sample.hh"
 
 #include <vector>
 #include <iostream>
@@ -27,13 +28,15 @@ using namespace std;
 void genPairs(uint64_t pSeed, uint64_t pN, vector<Gossamer::EdgeAndCount>& pItems)
 {
     static const double p = 1.0 / 1024.0;
-    std::mt19937 rng(pSeed);
+    std::mt19937_64 rng(pSeed);
     std::exponential_distribution<> dist(p);
+    std::vector<uint64_t> draw;
+    Gossamer::sampleWithoutReplacement(rng, pN * 1024, pN, draw);
+    std::sort(draw.begin(), draw.end());
 
-    Gossamer::EdgeAndCount itm(Gossamer::position_type(0), 0);
-    for (uint64_t i = 0; i < pN; ++i)
-    {
-        itm.first += dist(rng) + 1;
+    for (auto edge : draw) {
+        Gossamer::EdgeAndCount itm;
+        itm.first = Gossamer::position_type(edge);
         itm.second = dist(rng) + 1;
         pItems.push_back(itm);
     }
@@ -43,7 +46,7 @@ void writeFile(const string& pFn, const vector<Gossamer::EdgeAndCount>& pItems, 
 {
     FileFactory::OutHolderPtr outp(pFactory.out(pFn));
     ostream& out(**outp);
-    Gossamer::position_type prev(0);
+    Gossamer::position_type prev = ~Gossamer::position_type(0);
     for (uint64_t i = 0; i < pItems.size(); ++i)
     {
         EdgeCodec<Gossamer::EdgeAndCount>::encode(out, prev, pItems[i]);
@@ -62,7 +65,7 @@ BOOST_AUTO_TEST_CASE(test1)
     {
         FileFactory::InHolderPtr inp(fac.in("x1"));
         istream& in(**inp);
-        Gossamer::EdgeAndCount itm(Gossamer::position_type(0), 0);
+        Gossamer::EdgeAndCount itm(~Gossamer::position_type(0), 0);
         uint64_t i = 0;
         while (in.good())
         {

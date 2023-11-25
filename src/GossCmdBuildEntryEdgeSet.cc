@@ -30,7 +30,7 @@
 #include "RunLengthCodedBitVectorWord.hh"
 #include "RunLengthCodedSet.hh"
 #include "Timer.hh"
-#include "VByteCodec.hh"
+#include "IntegerCodecs.hh"
 
 #include <iostream>
 #include <unordered_map>

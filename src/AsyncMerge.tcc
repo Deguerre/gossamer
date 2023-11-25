@@ -10,7 +10,7 @@
 #include "Graph.hh"
 #include "JobManager.hh"
 #include "RankSelect.hh"
-#include "VByteCodec.hh"
+#include "IntegerCodecs.hh"
 
 #include <iostream>
 #include <stdio.h>
@@ -109,6 +109,7 @@ namespace
               mOffset(0), mEdgesRead(0), mItem()
         {
             mItems.reserve(mNumItems);
+            Gossamer::EdgeItemTraits<Item>::edge(mItem) = ~Gossamer::position_type(0);
         }
 
         ~Loader()

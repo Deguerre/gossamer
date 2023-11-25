@@ -102,7 +102,7 @@ namespace {
 
             Builder(const std::string& pBaseName, FileFactory& pFactory)
                 : mOutHolder(pFactory.out(pBaseName)), mOut(**mOutHolder),
-                  mPrevEdge(0)
+                  mPrevEdge(~Gossamer::position_type(0))
             {
             }
 

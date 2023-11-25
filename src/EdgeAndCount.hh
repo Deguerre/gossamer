@@ -17,8 +17,8 @@
 #include "TrivialVector.hh"
 #endif
 
-#ifndef VBYTECODEC_HH
-#include "VByteCodec.hh"
+#ifndef INTEGERCODECS_HH
+#include "IntegerCodecs.hh"
 #endif
 
 #ifndef STD_ISTREAM
@@ -40,6 +40,9 @@
 #include <stdio.h>
 #define STDIO_H
 #endif
+
+
+#undef GOSS_CODEC_RUNTIME_CHECKS
 
 namespace Gossamer
 {
@@ -63,6 +66,11 @@ namespace Gossamer
         {
             return pEC.first;
         }
+
+        static inline position_type& edge(EdgeAndCount& pEC)
+        {
+            return pEC.first;
+        }
     };
 
     template<>
@@ -73,6 +81,11 @@ namespace Gossamer
         }
 
         static inline const position_type& edge(const position_type& pEdge)
+        {
+            return pEdge;
+        }
+
+        static inline position_type& edge(position_type& pEdge)
         {
             return pEdge;
         }
@@ -126,10 +139,12 @@ struct EdgeCodec<Gossamer::EdgeAndCount>
                            const Gossamer::position_type& pPrevEdge,
                            const Gossamer::EdgeAndCount& pItm)
         {
-            BOOST_ASSERT(pPrevEdge <= pItm.first);
+#ifdef GOSS_CODEC_RUNTIME_CHECKS
+            BOOST_ASSERT(pPrevEdge == ~Gossamer::position_type(0) ||  pPrevEdge <= pItm.first);
+#endif
             TrivialVector<uint8_t,sizeof(Gossamer::EdgeAndCount) * 9 / 8 + 1> v;
             Gossamer::position_type::value_type d = pItm.first.value();
-            d -= pPrevEdge.value();
+            d.subtract1(pPrevEdge.value());
 
             std::pair<const uint64_t*,const uint64_t*> ws = d.words();
             for (const uint64_t* i = ws.first; i < ws.second; ++i)
@@ -149,7 +164,7 @@ struct EdgeCodec<Gossamer::EdgeAndCount>
             {
                 *i = VByteCodec::decode(adapter);
             }
-            d += pItm.first.value();
+            d.add1(pItm.first.value());
             pItm.first = Gossamer::position_type(d);
             pItm.second = VByteCodec::decode(adapter);
         }
@@ -162,7 +177,9 @@ struct EdgeCodec<Gossamer::position_type>
         const Gossamer::position_type& pPrevEdge,
         const Gossamer::position_type & pItm)
     {
-        BOOST_ASSERT(pPrevEdge <= pItm);
+#ifdef GOSS_CODEC_RUNTIME_CHECKS
+        BOOST_ASSERT(pPrevEdge == ~Gossamer::position_type(0) || pPrevEdge <= pItm);
+#endif
         TrivialVector<uint8_t, sizeof(Gossamer::position_type) * 9 / 8 + 1> v;
         Gossamer::position_type::value_type d = pItm.value();
         d -= pPrevEdge.value();

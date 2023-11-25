@@ -9,8 +9,8 @@
 #ifndef PAIRLINK_HH
 #define PAIRLINK_HH
 
-#ifndef VBYTECODEC_HH
-#include "VByteCodec.hh"
+#ifndef INTEGERCODECS_HH
+#include "IntegerCodecs.hh"
 #endif
 
 #ifndef SUPERPATHID_HH

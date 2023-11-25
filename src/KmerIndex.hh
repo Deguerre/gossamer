@@ -13,8 +13,8 @@
 #include "KmerSet.hh"
 #endif
 
-#ifndef VWORD32CODEC_HH
-#include "VWord32Codec.hh"
+#ifndef INTEGERCODECS_HH
+#include "IntegerCodecs.hh"
 #endif
 
 #ifndef TRIVIALVECTOR_HH

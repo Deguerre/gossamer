@@ -45,6 +45,23 @@ namespace Gossamer {
 			return _mm_xor_si128(x, _mm_cmpeq_epi32(x, x));
 		}
 
+		inline int128 or_128(int128 x, int128 y) {
+			return _mm_or_si128(x, y);
+		}
+
+		inline int128 and_128(int128 x, int128 y) {
+			return _mm_and_si128(x, y);
+		}
+
+		inline int128 xor_128(int128 x, int128 y) {
+			return _mm_xor_si128(x, y);
+		}
+
+		// x & ~y
+		inline int128 andnot_128(int128 x, int128 y) {
+			return _mm_andnot_si128(y, x);
+		}
+
 #ifdef GOSS_EXT_SSSE3
 		inline int128 byte_reverse_128(int128 x) {
 			return _mm_shuffle_epi8(x, _mm_set_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15));

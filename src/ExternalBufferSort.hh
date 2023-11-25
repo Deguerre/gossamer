@@ -21,8 +21,8 @@
 #include "TrivialVector.hh"
 #endif
 
-#ifndef VBYTECODEC_HH
-#include "VByteCodec.hh"
+#ifndef INTEGERCODECS_HH
+#include "IntegerCodecs.hh"
 #endif
 
 #ifndef STD_VECTOR

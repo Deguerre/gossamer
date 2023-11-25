@@ -30,7 +30,7 @@
 #include "ReadSequenceFileSequence.hh"
 #include "ReverseComplementAdapter.hh"
 #include "Timer.hh"
-#include "VByteCodec.hh"
+#include "IntegerCodecs.hh"
 
 #include <iostream>
 #include <stdexcept>

@@ -29,7 +29,7 @@
 #include "Profile.hh"
 #include "ReadSequenceFileSequence.hh"
 #include "Timer.hh"
-#include "VByteCodec.hh"
+#include "IntegerCodecs.hh"
 
 #include <iostream>
 #include <stdexcept>

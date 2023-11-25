@@ -6,7 +6,7 @@
 // you may not use this file except in compliance with the License.
 // Please see the file LICENSE, included with this distribution.
 //
-#include "VByteCodec.hh"
+#include "IntegerCodecs.hh"
 
 #include <boost/dynamic_bitset.hpp>
 #include <random>
@@ -15,7 +15,7 @@
 using namespace boost;
 using namespace std;
 
-#define GOSS_TEST_MODULE TestVByteCodec
+#define GOSS_TEST_MODULE TestIntegerCodecs
 #include "testBegin.hh"
 
 BOOST_AUTO_TEST_CASE(test1a)
