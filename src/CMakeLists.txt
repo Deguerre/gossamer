@@ -24,6 +24,7 @@ ADD_LIBRARY(gosslib STATIC
 	Graph.cc
 	GraphTrimmer.cc
 	IntegerArray.cc
+	IntegerCodecs.cc
 	KmerSet.cc
 	LevenbergMarquardt.cc
 	LineSource.cc

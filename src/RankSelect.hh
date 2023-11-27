@@ -286,7 +286,12 @@ namespace Gossamer
         }
 #endif
 
-        value_return_type value() const
+        value_const_reference value() const
+        {
+            return mValue;
+        }
+
+        value_reference value()
         {
             return mValue;
         }

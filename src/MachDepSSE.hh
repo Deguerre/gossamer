@@ -62,6 +62,18 @@ namespace Gossamer {
 			return _mm_andnot_si128(y, x);
 		}
 
+		inline int128 load1_8x8_128(uint8_t x) {
+			return _mm_set1_epi8(x);
+		}
+
+		inline int128 compare_gt8_128(int128 x, int128 y) {
+			return _mm_cmpgt_epi8(x, y);
+		}
+
+		inline uint64_t movemask_8_128(int128 x) {
+			return _mm_movemask_epi8(x);
+		}
+
 #ifdef GOSS_EXT_SSSE3
 		inline int128 byte_reverse_128(int128 x) {
 			return _mm_shuffle_epi8(x, _mm_set_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15));

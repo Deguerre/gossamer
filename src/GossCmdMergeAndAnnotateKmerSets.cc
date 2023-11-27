@@ -392,7 +392,7 @@ GossCmdMergeAndAnnotateKmerSets::operator()(const GossCmdContext& pCxt)
             wq.addDependency(item.done, jobDone);
         }
 
-        for (unsigned i = 0; i + 1 < items.size(); ++i) {
+        for (uint64_t i = 0; i + 1 < items.size(); ++i) {
             wq.addDependency(items[i].edgeWriter, items[i + 1].edgeWriter);
             wq.addDependency(items[i].bitWriter, items[i + 1].bitWriter);
         }

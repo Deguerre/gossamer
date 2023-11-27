@@ -484,23 +484,6 @@ public:
         return *this;
     }
 
-    BigInteger operator~()
-    {
-        BigInteger retval;
-#ifdef GOSS_HAVE_SIMD128
-        if constexpr (Words == 2) {
-            using namespace Gossamer::simd;
-            auto x = load_aligned_128(&mImpl.mWords[0]);
-            store_aligned_128(&retval.mImpl.mWords[0], not_128(x));
-            return retval;
-        }
-#endif
-        Gossamer::unrolled_loop<int, Words>([&](auto i) {
-            retval.mImpl.mWords[i] = ~mImpl.mWords[i];
-        });
-        return retval;
-    }
-
     BigInteger& operator++()
     {
         bool carry = Gossamer::add64(mImpl.mWords[0], 0, true, mImpl.mWords[0]);
@@ -668,6 +651,27 @@ private:
         std::memset(&mImpl, 0, sizeof(mImpl));
     }
 };
+
+
+template<int Words>
+inline BigInteger<Words>
+operator~(BigInteger<Words> pRhs)
+{
+#ifdef GOSS_HAVE_SIMD128
+    if constexpr (Words == 2) {
+        using namespace Gossamer::simd;
+        auto x = load_aligned_128(&pRhs.words().first[0]);
+        store_aligned_128(&pRhs.words().first[0], not_128(x));
+        return pRhs;
+    }
+#endif
+    Gossamer::unrolled_loop<int, Words>([&](auto i) {
+        pRhs.words().first[i] = ~pRhs.words().first[i];
+    });
+    return pRhs;
+}
+
+
 
 // std::numeric_limits
 namespace std {
