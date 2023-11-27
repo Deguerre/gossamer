@@ -147,12 +147,13 @@ namespace // anonymous
             void push_back(const Gossamer::position_type& pEdge, const uint64_t& pCount)
             {
                 Gossamer::EdgeAndCount itm(pEdge, pCount);
-                EdgeCodec<Gossamer::EdgeAndCount>::encode(mOut, mPrevEdge, itm);
+                mEncoder.encode(mOut, mPrevEdge, itm);
                 mPrevEdge = itm.first;
             }
 
             void end()
             {
+                mEncoder.flush(mOut);
             }
 
             Builder(const std::string& pBaseName, FileFactory& pFactory)
@@ -165,6 +166,7 @@ namespace // anonymous
             FileFactory::OutHolderPtr mOutHolder;
             std::ostream& mOut;
             Gossamer::position_type mPrevEdge;
+            EdgeEncoder<Gossamer::EdgeAndCount> mEncoder;
         };
     };
 

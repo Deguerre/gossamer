@@ -183,6 +183,14 @@ public:
 
     bool fitsIn64Bits() const
     {
+        if constexpr (sWords == 1) {
+            return true;
+        }
+
+        if constexpr (sWords == 2) {
+            return !mImpl.mWords[1];
+        }
+
         word_type test(0);
         for (int64_t i = 1; i < Words; ++i)
         {

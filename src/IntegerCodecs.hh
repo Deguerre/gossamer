@@ -470,12 +470,14 @@ public:
         }
 
         mOutput.clear();
-        uint64_t decword = decodeWord(*pItr++);
+        uint64_t decword = decodeWord(*pItr);
+        ++pItr;
         if (decword & sContinuationBit) {
             Item item(decword & sStorageMask);
             do {
                 item <<= sStorageBits;
-                decword = decodeWord(*pItr++);
+                decword = decodeWord(*pItr);
+                ++pItr;
                 item |= decword & sStorageMask;
             } while (decword & sContinuationBit);
             mOutputPos = 0;

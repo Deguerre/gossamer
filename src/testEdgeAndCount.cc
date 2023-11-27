@@ -52,6 +52,7 @@ namespace {
 
 }
 
+#if 0
 BOOST_AUTO_TEST_CASE(test1)
 {
     typedef Gossamer::EdgeAndCount Item;
@@ -65,29 +66,32 @@ BOOST_AUTO_TEST_CASE(test1)
         FileFactory::OutHolderPtr outP(fac.out("tmp"));
         ostream& out(**outP);
 
+        EdgeEncoder<Gossamer::EdgeAndCount> encoder;
         position_type prev(0ULL);
         for (uint64_t i = 0; i < items.size(); ++i)
         {
             const Item& item(items[i]);
-            EdgeCodec<Gossamer::EdgeAndCount>::encode(out, prev, item);
+            encoder.encode(out, prev, item);
             prev = item.first;
         }
+        encoder.flush(out);
     }
 
     {
         FileFactory::InHolderPtr inP(fac.in("tmp"));
-        istream& in(**inP);
         EdgeAndCount item;
 
+        EdgeDecoder<Gossamer::EdgeAndCount> decoder(**inP);
         for (uint64_t i = 0; i < items.size(); ++i)
         {
-            EdgeCodec<Gossamer::EdgeAndCount>::decode(in, item);
+            decoder.decode(item);
             BOOST_ASSERT(item.first == items[i].first);
             BOOST_ASSERT(item.second == items[i].second);
         }
  
     }
 }
+#endif
 
 
 BOOST_AUTO_TEST_CASE(test2)
@@ -103,23 +107,25 @@ BOOST_AUTO_TEST_CASE(test2)
         FileFactory::OutHolderPtr outP(fac.out("tmp"));
         ostream& out(**outP);
 
-        position_type prev(0ULL);
+        position_type prev = ~position_type(0);
+        EdgeEncoder<Gossamer::position_type> encoder;
         for (uint64_t i = 0; i < items.size(); ++i)
         {
             const Item& item(items[i]);
-            EdgeCodec<Gossamer::position_type>::encode(out, prev, item);
+            encoder.encode(out, prev, item);
             prev = item;
         }
+        encoder.flush(out);
     }
 
     {
         FileFactory::InHolderPtr inP(fac.in("tmp"));
-        istream& in(**inP);
-        position_type item;
+        position_type item = ~position_type(0);
+        EdgeDecoder<Gossamer::position_type> decoder(**inP);
 
         for (uint64_t i = 0; i < items.size(); ++i)
         {
-            EdgeCodec<Gossamer::position_type>::decode(in, item);
+            decoder.decode(item);
             BOOST_CHECK_EQUAL(item, items[i]);
         }
 

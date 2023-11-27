@@ -78,20 +78,14 @@ namespace
 
         void fill()
         {
-            //cerr << "filling from " << mFileName << endl;
-            //cerr << "space = " << (mNumItems - mItems.size()) << endl;
-            FileFactory::InHolderPtr inp(mFactory.in(mFileName));
-            std::istream& in(**inp);
-            in.seekg(mOffset);
-
             //std::cerr << "seeked = " << mOffset << endl;
             //std::cerr << " in.good() = " << in.good() << endl;
             //std::uint64_t z = mItems.size();
             //std::cerr << "mItem = " << lexical_cast<string>(mItem.first) << " : " << mItem.second << endl;
-            while (in.good() && mItems.size() < mNumItems)
+            while (mDecoder.good() && mItems.size() < mNumItems)
             {
-                EdgeCodec<Item>::decode(in, mItem);
-                if (!in.good())
+                mDecoder.decode(mItem);
+                if (!mDecoder.good())
                 {
                     break;
                 }
@@ -100,13 +94,11 @@ namespace
                 mEdgesRead++;
             }
             //cerr << "read " << (mItems.size() - z) << endl;
-            mOffset = in.tellg();
-            //cerr << "mOffset = " << mOffset << endl << endl;
         }
 
         Loader(const std::string& pFileName, std::uint64_t pExpectedEdges, std::uint64_t pNumItems, FileFactory& pFactory)
             : mFactory(pFactory), mFileName(pFileName), mExpectedEdges(pExpectedEdges), mNumItems(pNumItems),
-              mOffset(0), mEdgesRead(0), mItem()
+              mEdgesRead(0), mItem(), mInP(mFactory.in(mFileName)), mDecoder(**mInP)
         {
             mItems.reserve(mNumItems);
             Gossamer::EdgeItemTraits<Item>::edge(mItem) = ~Gossamer::position_type(0);
@@ -124,10 +116,11 @@ namespace
         const std::uint64_t mExpectedEdges;
         const std::uint64_t mNumItems;
         const JobManager::Tokens mDeps;
-        std::uint64_t mOffset;
         std::uint64_t mEdgesRead;
         Item mItem;
         std::vector<Item> mItems;
+        FileFactory::InHolderPtr mInP;
+        EdgeDecoder<Item> mDecoder;
     };
 
     template<typename Item>

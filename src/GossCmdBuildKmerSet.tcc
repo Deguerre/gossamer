@@ -92,12 +92,13 @@ namespace {
         public:
             void push_back(const Gossamer::position_type& pEdge)
             {
-                EdgeCodec<Gossamer::position_type>::encode(mOut, mPrevEdge, pEdge);
+                mEncoder.encode(mOut, mPrevEdge, pEdge);
                 mPrevEdge = pEdge;
             }
 
             void end()
             {
+                mEncoder.flush(mOut);
             }
 
             Builder(const std::string& pBaseName, FileFactory& pFactory)
@@ -110,6 +111,7 @@ namespace {
             FileFactory::OutHolderPtr mOutHolder;
             std::ostream& mOut;
             Gossamer::position_type mPrevEdge;
+            EdgeEncoder<Gossamer::position_type> mEncoder;
         };
     };
 

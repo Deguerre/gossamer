@@ -9,6 +9,7 @@
 #include "AsyncMerge.hh"
 #include "EdgeAndCount.hh"
 #include "Graph.hh"
+#include "KmerSet.hh"
 #include "StringFileFactory.hh"
 #include "Sample.hh"
 
@@ -42,34 +43,51 @@ void genPairs(uint64_t pSeed, uint64_t pN, vector<Gossamer::EdgeAndCount>& pItem
     }
 }
 
-void writeFile(const string& pFn, const vector<Gossamer::EdgeAndCount>& pItems, FileFactory& pFactory)
+void genEdges(uint64_t pSeed, uint64_t pN, vector<Gossamer::position_type>& pItems)
+{
+    static const double p = 1.0 / 1024.0;
+    std::mt19937_64 rng(pSeed);
+    std::vector<uint64_t> draw;
+    Gossamer::sampleWithoutReplacement(rng, pN * 1024, pN, draw);
+    std::sort(draw.begin(), draw.end());
+
+    for (auto edge : draw) {
+        pItems.push_back(Gossamer::position_type(edge));
+    }
+}
+
+template<typename Item>
+void writeFile(const string& pFn, const vector<Item>& pItems, FileFactory& pFactory)
 {
     FileFactory::OutHolderPtr outp(pFactory.out(pFn));
     ostream& out(**outp);
     Gossamer::position_type prev = ~Gossamer::position_type(0);
+    EdgeEncoder<Item> encoder;
     for (uint64_t i = 0; i < pItems.size(); ++i)
     {
-        EdgeCodec<Gossamer::EdgeAndCount>::encode(out, prev, pItems[i]);
-        prev = pItems[i].first;
+        encoder.encode(out, prev, pItems[i]);
+        prev = Gossamer::EdgeItemTraits<Item>::edge(pItems[i]);
     }
+    encoder.flush(out);
 }
 
-BOOST_AUTO_TEST_CASE(test1)
+BOOST_AUTO_TEST_CASE(test1_eac)
 {
     StringFileFactory fac;
 
     vector<Gossamer::EdgeAndCount> x1;
     genPairs(17, 65536, x1);
-    writeFile("x1", x1, fac);
+    writeFile<Gossamer::EdgeAndCount>("x1", x1, fac);
 
     {
         FileFactory::InHolderPtr inp(fac.in("x1"));
         istream& in(**inp);
         Gossamer::EdgeAndCount itm(~Gossamer::position_type(0), 0);
         uint64_t i = 0;
+        EdgeDecoder<Gossamer::EdgeAndCount> decoder(in);
         while (in.good())
         {
-            EdgeCodec<Gossamer::EdgeAndCount>::decode(in, itm);
+            decoder.decode(itm);
             if (!in.good())
             {
                 break;
@@ -81,17 +99,46 @@ BOOST_AUTO_TEST_CASE(test1)
     }
 }
 
+BOOST_AUTO_TEST_CASE(test1_pt)
+{
+    StringFileFactory fac;
+
+    vector<Gossamer::position_type> x1;
+    genEdges(17, 65536, x1);
+    writeFile<Gossamer::position_type>("x1", x1, fac);
+
+    {
+        FileFactory::InHolderPtr inp(fac.in("x1"));
+        istream& in(**inp);
+        Gossamer::position_type itm = ~Gossamer::position_type(0);
+        uint64_t i = 0;
+        EdgeDecoder<Gossamer::position_type> decoder(in);
+        while (in.good())
+        {
+            decoder.decode(itm);
+            if (!in.good())
+            {
+                break;
+            }
+            BOOST_CHECK(i < x1.size());
+            BOOST_CHECK(x1[i] == itm);
+            ++i;
+        }
+    }
+}
+
+
 BOOST_AUTO_TEST_CASE(test2)
 {
     StringFileFactory fac;
 
     vector<Gossamer::EdgeAndCount> x1;
     genPairs(17, 65536, x1);
-    writeFile("x1", x1, fac);
+    writeFile<Gossamer::EdgeAndCount>("x1", x1, fac);
 
     vector<Gossamer::EdgeAndCount> x2;
     genPairs(18, 65536, x2);
-    writeFile("x2", x2, fac);
+    writeFile<Gossamer::EdgeAndCount>("x2", x2, fac);
 
     vector<Gossamer::EdgeAndCount> x3;
     {

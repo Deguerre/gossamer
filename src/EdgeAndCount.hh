@@ -43,6 +43,7 @@
 
 
 #undef GOSS_CODEC_RUNTIME_CHECKS
+#undef GOSS_CODEC_FORCE_VBYTE
 
 namespace Gossamer
 {
@@ -97,7 +98,13 @@ namespace Gossamer
 
 namespace // anonymous
 {
+    template<typename Type>
     class InAdapter
+    {
+    };
+
+    template<>
+    class InAdapter<uint8_t>
     {
     public:
         uint8_t operator*()
@@ -120,28 +127,65 @@ namespace // anonymous
     private:
         std::istream& mFile;
     };
+
+
+    template<>
+    class InAdapter<uint64_t>
+    {
+    public:
+        uint64_t operator*()
+        {
+            return mEof ? 0 : mBuffer;
+        }
+
+        void operator++()
+        {
+            fillBuffer();
+        }
+
+        InAdapter(std::istream& pFile)
+            : mFile(pFile)
+        {
+            fillBuffer();
+        }
+
+    private:
+        std::istream& mFile;
+        uint64_t mBuffer;
+        bool mEof;
+
+        void fillBuffer() {
+            mFile.read((char*)&mBuffer, sizeof(mBuffer));
+            mEof = !mFile.good();
+        }
+    };
 }
 // namespace anonymous
 
 
 template<typename Item>
-struct EdgeCodec
+struct EdgeEncoder
 {
-    static void encode(std::ostream& pOut, const Gossamer::position_type& pPrevEdge, const Item& pItm);
-    static void decode(std::istream& pIn, Item& pItm);
+};
+
+
+template<typename Item>
+struct EdgeDecoder
+{
 };
 
 
 template<>
-struct EdgeCodec<Gossamer::EdgeAndCount>
+struct EdgeEncoder<Gossamer::EdgeAndCount>
 {
-        static void encode(std::ostream& pOut,
+        void encode(std::ostream& pOut,
                            const Gossamer::position_type& pPrevEdge,
                            const Gossamer::EdgeAndCount& pItm)
         {
 #ifdef GOSS_CODEC_RUNTIME_CHECKS
             BOOST_ASSERT(pPrevEdge == ~Gossamer::position_type(0) ||  pPrevEdge <= pItm.first);
 #endif
+
             TrivialVector<uint8_t,sizeof(Gossamer::EdgeAndCount) * 9 / 8 + 1> v;
             Gossamer::position_type::value_type d = pItm.first.value();
             d.subtract1(pPrevEdge.value());
@@ -155,55 +199,136 @@ struct EdgeCodec<Gossamer::EdgeAndCount>
             pOut.write(reinterpret_cast<const char*>(&v[0]), v.size());
         }
 
-        static void decode(std::istream& pIn, Gossamer::EdgeAndCount& pItm)
+        void flush(std::ostream& pOut)
         {
-            InAdapter adapter(pIn);
-            Gossamer::position_type::value_type d = pItm.first.value();
-            std::pair<uint64_t*,uint64_t*> ws = d.words();
-            for (uint64_t* i = ws.first; i != ws.second; ++i)
-            {
-                *i = VByteCodec::decode(adapter);
-            }
-            d.add1(pItm.first.value());
-            pItm.first = Gossamer::position_type(d);
-            pItm.second = VByteCodec::decode(adapter);
         }
 };
 
+
 template<>
-struct EdgeCodec<Gossamer::position_type>
+struct EdgeDecoder<Gossamer::EdgeAndCount>
 {
-    static void encode(std::ostream& pOut,
+    void decode(Gossamer::EdgeAndCount& pItm)
+    {
+        Gossamer::position_type::value_type d = pItm.first.value();
+        std::pair<uint64_t*, uint64_t*> ws = d.words();
+        for (uint64_t* i = ws.first; i != ws.second; ++i)
+        {
+            *i = VByteCodec::decode(mAdapter);
+        }
+        d.add1(pItm.first.value());
+        pItm.first = Gossamer::position_type(d);
+        pItm.second = VByteCodec::decode(mAdapter);
+    }
+
+    EdgeDecoder(std::istream& pIn)
+        : mIn(pIn), mAdapter(pIn)
+    {
+    }
+
+    bool good() const {
+        return mIn.good();
+    }
+
+private:
+    std::istream& mIn;
+    InAdapter<uint8_t> mAdapter;
+};
+
+
+template<>
+struct EdgeEncoder<Gossamer::position_type>
+{
+    void encode(std::ostream& pOut,
         const Gossamer::position_type& pPrevEdge,
         const Gossamer::position_type & pItm)
     {
 #ifdef GOSS_CODEC_RUNTIME_CHECKS
         BOOST_ASSERT(pPrevEdge == ~Gossamer::position_type(0) || pPrevEdge <= pItm);
 #endif
-        TrivialVector<uint8_t, sizeof(Gossamer::position_type) * 9 / 8 + 1> v;
-        Gossamer::position_type::value_type d = pItm.value();
-        d -= pPrevEdge.value();
 
+#ifndef GOSS_CODEC_FORCE_VBYTE
+        typedef uint64_t encoded_type;
+#else
+        typedef uint8_t encoded_type;
+#endif
+
+        TrivialVector<encoded_type, 20> v;
+        Gossamer::position_type d = pItm;
+        d.value().subtract1(pPrevEdge.value());
+ 
+#ifndef GOSS_CODEC_FORCE_VBYTE
+        mEncoder.encode(d, v);
+#else
         std::pair<const uint64_t*, const uint64_t*> ws = d.words();
         for (const uint64_t* i = ws.first; i < ws.second; ++i)
         {
             VByteCodec::encode(*i, v);
         }
-        pOut.write(reinterpret_cast<const char*>(&v[0]), v.size());
+#endif
+        pOut.write(reinterpret_cast<const char*>(&v[0]), v.size() * sizeof(encoded_type));
     }
 
-    static void decode(std::istream& pIn, Gossamer::position_type& pItm)
+    void flush(std::ostream& pOut)
     {
-        InAdapter adapter(pIn);
-        Gossamer::position_type::value_type d = pItm.value();
+#ifndef GOSS_CODEC_FORCE_VBYTE
+        TrivialVector<uint64_t, 20> v;
+        mEncoder.flush(v);
+        pOut.write(reinterpret_cast<const char*>(&v[0]), v.size() * sizeof(uint64_t));
+#endif
+    }
+
+private:
+#ifndef GOSS_CODEC_FORCE_VBYTE
+    Simple8bEncode<Gossamer::position_type> mEncoder;
+#endif
+};
+
+
+template<>
+struct EdgeDecoder<Gossamer::position_type>
+{
+#ifndef GOSS_CODEC_FORCE_VBYTE
+    typedef uint64_t encoded_type;
+#else
+    typedef uint8_t encoded_type;
+#endif
+
+    void decode(Gossamer::position_type& pItm)
+    {
+#ifndef GOSS_CODEC_FORCE_VBYTE
+        auto dec = mDecoder.decode(mAdapter);
+        pItm.value().add1(dec.value());
+#else
+        Gossamer::position_type::value_type d;
         std::pair<uint64_t*, uint64_t*> ws = d.words();
         for (uint64_t* i = ws.first; i != ws.second; ++i)
         {
-            *i = VByteCodec::decode(adapter);
+            *i = VByteCodec::decode(mAdapter);
         }
-        d += pItm.value();
-        pItm = Gossamer::position_type(d);
+        pItm.value().add1(d);
+#endif
     }
+
+    EdgeDecoder(std::istream& pIn)
+        : mIn(pIn), mAdapter(pIn)
+    {
+    }
+
+    bool good() const {
+#ifndef GOSS_CODEC_FORCE_VBYTE
+        return !mDecoder.empty() || mIn.good();
+#else
+        return mIn.good();
+#endif
+    }
+
+private:
+    std::istream& mIn;
+    InAdapter<encoded_type> mAdapter;
+#ifndef GOSS_CODEC_FORCE_VBYTE
+    Simple8bDecode<Gossamer::position_type> mDecoder;
+#endif
 };
 
 
