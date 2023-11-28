@@ -43,7 +43,7 @@
 
 
 #undef GOSS_CODEC_RUNTIME_CHECKS
-#undef GOSS_CODEC_FORCE_VBYTE
+#define GOSS_CODEC_FORCE_VBYTE
 
 namespace Gossamer
 {
