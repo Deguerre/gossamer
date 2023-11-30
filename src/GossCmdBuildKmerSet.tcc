@@ -498,6 +498,9 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
             }
 
             Gossamer::position_type kmer = *pKmerSrc;
+            if (kmer == Gossamer::position_type(0)) {
+                std::cerr << "Zero kmer found!\n";
+            }
             curblk->push_back(kmer);
             if (curblk->size() >= buffer_size) {
                 auto thisblk = curblk;
@@ -507,6 +510,9 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
                     // std::cerr << "Thread received " << thisblk << "\n";
 
                     for (auto& kmer : *thisblk) {
+                        if (kmer == Gossamer::position_type(0)) {
+                            std::cerr << "Zero kmer found!\n";
+                        }
                         kmer.normalize(mK);
                     }
 

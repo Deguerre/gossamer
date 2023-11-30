@@ -30,6 +30,9 @@
 #include "GossCmdGroupReads.hh"
 #include "GossCmdHelp.hh"
 #include "GossCmdMergeAndAnnotateKmerSets.hh"
+#include "GossCmdDumpKmerSet.hh"
+
+#undef ONLY_RELEASED_COMMANDS
 
 using namespace boost;
 using namespace boost::program_options;
@@ -288,4 +291,10 @@ XenoApp::XenoApp()
     commonOpts.addOpt<strings>("line-in", "", "input file with one sequence per line");
     commonOpts.addOpt<string>("prefix", "P", "filename prefix for index");
     commonOpts.addOpt<double>("max-memory", "M", "maximum memory (in GB) to use");
+
+#ifndef ONLY_RELEASED_COMMANDS
+    cmds.push_back(GossCmdReg("dump-kmer-set", GossCmdFactoryPtr(new GossCmdFactoryDumpKmerSet)));
+    commonOpts.addOpt<strings>("graph-in", "G", "name of the input graph object");
+    commonOpts.addOpt<string>("output-file", "o", "output file name ('-' for standard output)");
+#endif
 }

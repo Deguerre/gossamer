@@ -126,6 +126,7 @@ endif(BUILDING_goss)
 ADD_LIBRARY(xenomeapp STATIC
 	XenoApp.cc GossOption.cc GossCmdReg.cc GossCmdHelp.cc 
 	GossCmdBuildKmerSet.cc
+	GossCmdDumpKmerSet.cc
 	GossCmdMergeAndAnnotateKmerSets.cc
 	GossCmdComputeNearKmers.cc
 	GossCmdGroupReads.cc
