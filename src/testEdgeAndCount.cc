@@ -115,7 +115,7 @@ BOOST_AUTO_TEST_CASE(test2)
             encoder.encode(out, prev, item);
             prev = item;
         }
-        encoder.flush(out);
+        encoder.encodeEof(out);
     }
 
     {

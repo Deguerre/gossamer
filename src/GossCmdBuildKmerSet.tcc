@@ -98,7 +98,7 @@ namespace {
 
             void end()
             {
-                mEncoder.flush(mOut);
+                mEncoder.encodeEof(mOut);
             }
 
             Builder(const std::string& pBaseName, FileFactory& pFactory)
@@ -116,7 +116,7 @@ namespace {
     };
 
     uint64_t flushMerge(KmerBlock **pBlocks, unsigned pNumBlocks, const std::string& pGraphName,
-                        Logger& pLog, FileFactory& pFactory)
+                        Logger& pLog, FileFactory& pFactory, bool pFlushThis = false)
     {
         struct HeapEntry {
             KmerBlock* block;
@@ -126,6 +126,12 @@ namespace {
 
         HeapEntry merge_entries[sMergePly];
         HeapEntry* heap[sMergePly];
+
+        FileFactory::OutHolderPtr dumpFile;
+        if (pFlushThis) {
+            dumpFile = pFactory.out("flush-graph.txt");
+            **dumpFile << std::hex << std::setprecision(8);
+        }
 
         unsigned entries = 0;
         for (unsigned i = 0; i < pNumBlocks; ++i) {
@@ -166,7 +172,6 @@ namespace {
         {
             NakedGraph::Builder bld(pGraphName, pFactory);
             while (entries) {
-
                 while (!heap[0]->empty() && *heap[0]->ii == prev) {
                     ++heap[0]->ii;
                 }
@@ -200,10 +205,10 @@ namespace {
                 }
 
                 // Try a down heap
-                bool down_heap_worked = false;
                 if (entries) {
                     int parent = 0;
                     int child;
+                    bool down_heap_worked = false;
                     do {
                         child = 2 * parent + 1;
                         if (child >= entries) {
@@ -220,18 +225,32 @@ namespace {
                         parent = child;
                     } while (true);
                     // check_heap();
-                }
-
-                if (!down_heap_worked) {
-                    // We must have exhausted this entry.
-                    bld.push_back(prev);
-                    ++n;
-                    if (entries) {
-                        BOOST_ASSERT(prev < *heap[0]->ii);
-                        prev = *heap[0]->ii;
-                        // check_heap();
+                    if (down_heap_worked) {
+                        continue;
                     }
                 }
+
+                // We must have exhausted this entry.
+                if (pFlushThis) {
+                    **dumpFile << std::setfill('0') << std::setw(16) << prev.asUInt64() << '\n';
+                }
+                if (prev.asUInt64() > 0x3ffffffffffe0) {
+                    std::cerr << "Kmer found!\n";
+                }
+
+                bld.push_back(prev);
+                ++n;
+                if (entries) {
+                    BOOST_ASSERT(prev < *heap[0]->ii);
+                    prev = *heap[0]->ii;
+                    if (prev.asUInt64() > 0x3ffffffffffe0) {
+                        std::cerr << "Magic case found\n";
+                    }
+                    // check_heap();
+                }
+            }
+            if (pFlushThis) {
+                **dumpFile << std::setfill('0') << std::setw(16) << prev.asUInt64() << '\n';
             }
             bld.push_back(prev);
         }
@@ -354,8 +373,7 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
     Timer t;
     log(info, "accumulating edges.");
     
-    std::vector<std::string> parts;
-    std::vector<uint64_t> sizes;
+    std::vector<AsyncMerge::Part> parts;
     std::string tmp = fac.tmpName();
 
 #ifdef GOSS_BUILD_KMER_SET_WITH_BACKYARD_HASH
@@ -415,12 +433,12 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
                     uint64_t sz = h.size();
                     double ld = static_cast<double>(sz) / static_cast<double>(cap);
                     log(info, "hash table load at dumping is " + boost::lexical_cast<std::string>(ld));
-                    std::string nm = tmp + "-" + boost::lexical_cast<std::string>(j++);
+                    std::string nm = tmp + "-" + boost::lexical_cast<std::string>(j);
                     log(info, "dumping temporary graph " + nm);
                     uint64_t z0 = flushNaked(h, nm, mT, log, fac);
                     z += z0;
-                    parts.push_back(nm);
-                    sizes.push_back(z0);
+                    parts.emplace_back(j, std::move(nm), z0);
+                    ++j;
                     h.clear();
                     nSinceClear = 0;
                     log(info, "done.");
@@ -445,23 +463,22 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
     {
         if (h.size() > 0)
         {
-            std::string nm = tmp + "-" + boost::lexical_cast<std::string>(j++);
+            std::string nm = tmp + "-" + boost::lexical_cast<std::string>(j);
             log(info, "dumping temporary graph " + nm);
             uint64_t z0 = flushNaked(h, nm, mT, log, fac);
             z += z0;
-            parts.push_back(nm);
-            sizes.push_back(z0);
+            parts.emplace_back(j, std::move(nm), z0);
+            ++j;
             h.clear();
             log(info, "done.");
         }
         
         log(info, "merging temporary graphs");
 
-        AsyncMerge::merge<KmerSet,false>(parts, sizes, mKmerSetName, mK, z, mT, 65536, fac);
+        AsyncMerge::merge<KmerSet,false>(parts, mKmerSetName, mK, z, mT, 65536, fac);
 
-        for (uint64_t i = 0; i < parts.size(); ++i)
-        {
-            fac.remove(parts[i]);
+        for (auto& part : parts) {
+            fac.remove(part.mFname);
         }
     }
 #else
@@ -498,9 +515,6 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
             }
 
             Gossamer::position_type kmer = *pKmerSrc;
-            if (kmer == Gossamer::position_type(0)) {
-                std::cerr << "Zero kmer found!\n";
-            }
             curblk->push_back(kmer);
             if (curblk->size() >= buffer_size) {
                 auto thisblk = curblk;
@@ -510,9 +524,6 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
                     // std::cerr << "Thread received " << thisblk << "\n";
 
                     for (auto& kmer : *thisblk) {
-                        if (kmer == Gossamer::position_type(0)) {
-                            std::cerr << "Zero kmer found!\n";
-                        }
                         kmer.normalize(mK);
                     }
 
@@ -528,7 +539,8 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
                             blocks_to_merge[i] = merge_blocks.back();
                             merge_blocks.pop_back();
                         }
-                        std::string nm = tmp + "-" + boost::lexical_cast<std::string>(temp_name++);
+                        auto this_name = temp_name++;
+                        std::string nm = tmp + "-" + boost::lexical_cast<std::string>(this_name);
                         log(info, "dumping temporary graph " + nm);
                         merge_lock.unlock();
                         auto z0 = flushMerge(blocks_to_merge, num_blocks, nm, log, fac);
@@ -540,8 +552,7 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
                             // std::cerr << "Recycled " << blocks_to_merge[i] << "\n";
                         }
                         condvar.notify_all();
-                        parts.push_back(nm);
-                        sizes.push_back(z0);
+                        parts.emplace_back(temp_name, std::move(nm), z0);
                         z += z0;
                     }
                 });
@@ -557,10 +568,14 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
             blocks_to_merge[i] = merge_blocks.back();
             merge_blocks.pop_back();
         }
-        std::string nm = tmp + "-" + boost::lexical_cast<std::string>(temp_name++);
+        auto this_name = temp_name++;
+        std::string nm = tmp + "-" + boost::lexical_cast<std::string>(this_name);
         log(info, "dumping temporary graph " + nm);
-        z += flushMerge(blocks_to_merge, num_blocks, nm, log, fac);
+        auto z0 = flushMerge(blocks_to_merge, num_blocks, nm, log, fac);
         log(info, "dump of " + nm + " done.");
+        parts.emplace_back(temp_name, std::move(nm), z0);
+        ++temp_name;
+        z += z0;
     }
 
     // Force a clear of buffer memory
@@ -571,12 +586,11 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
     if (parts.size() > 0) {
         log(info, "merging temporary graphs");
 
-        uint64_t buffer_size = Gossamer::align_down(std::max<uint64_t>(mM * 0.1 / parts.size(), 65536), Gossamer::sPageAlignBits) / sizeof(Gossamer::position_type);
-        AsyncMerge::merge<KmerSet,Gossamer::position_type>(parts, sizes, mKmerSetName, mK, z, mT, buffer_size, fac);
+        uint64_t buffer_size = Gossamer::align_down(std::max<uint64_t>(mM * 0.2 / parts.size(), 65536), Gossamer::sPageAlignBits) / sizeof(Gossamer::position_type);
+        AsyncMerge::merge<KmerSet,Gossamer::position_type>(parts, mKmerSetName, mK, z, mT, buffer_size, fac);
 
-        for (uint64_t i = 0; i < parts.size(); ++i)
-        {
-            fac.remove(parts[i]);
+        for (auto& part : parts) {
+            fac.remove(part.mFname);
         }
     }
 

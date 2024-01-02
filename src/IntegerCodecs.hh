@@ -28,6 +28,8 @@
 
 namespace VByteCodec
 {
+    static constexpr uint8_t sEofMarker0 = 0x80;
+    static constexpr uint8_t sEofMarker1 = 0x00;
     template <typename Dest>
     void encode(const uint64_t& pItem, Dest& pDest)
     {
@@ -110,8 +112,15 @@ namespace VByteCodec
         }
     }
 
+    template <typename Dest>
+    void encodeEof(Dest& pDest)
+    {
+        pDest.push_back(sEofMarker0);
+        pDest.push_back(sEofMarker1);
+    }
+
     template <typename Itr>
-    uint64_t decode(Itr& pItr, const Itr& pEnd)
+    bool decode(Itr& pItr, const Itr& pEnd, uint64_t& pItem)
     {
         BOOST_ASSERT(pItr != pEnd);
 
@@ -119,7 +128,13 @@ namespace VByteCodec
         ++pItr;
         if (z < 0x80)
         {
-            return z;
+            pItem = z;
+            return true;
+        }
+
+        uint8_t nz = *pItr;
+        if (z == sEofMarker0 && nz == sEofMarker1) {
+            return false;
         }
 
         // Count the number of leading 1s by sign-extending,
@@ -133,49 +148,56 @@ namespace VByteCodec
             case 8:
             {
                 BOOST_ASSERT(pItr != pEnd);
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 7:
             {
                 BOOST_ASSERT(pItr != pEnd);
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 6:
             {
                 BOOST_ASSERT(pItr != pEnd);
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 5:
             {
                 BOOST_ASSERT(pItr != pEnd);
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 4:
             {
                 BOOST_ASSERT(pItr != pEnd);
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 3:
             {
                 BOOST_ASSERT(pItr != pEnd);
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 2:
             {
                 BOOST_ASSERT(pItr != pEnd);
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 1:
             {
                 BOOST_ASSERT(pItr != pEnd);
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
             }
             case 0:
@@ -187,17 +209,24 @@ namespace VByteCodec
                 BOOST_ASSERT(false);
             }
         }
-        return r;
+        pItem = r;
+        return true;
     }
 
     template <typename Itr>
-    uint64_t decode(Itr& pItr)
+    bool decode(Itr& pItr, uint64_t& result)
     {
         uint8_t z = *pItr;
+
         ++pItr;
         if (z < 0x80)
         {
-            return z;
+            result = z;
+            return true;
+        }
+        uint8_t nz = *pItr;
+        if (z == sEofMarker0 && nz == sEofMarker1) {
+            return false;
         }
 
         // Count the number of leading 1s by sign-extending,
@@ -206,46 +235,54 @@ namespace VByteCodec
         uint64_t n = Gossamer::count_leading_zeroes(~x);
         uint64_t r = static_cast<uint8_t>(x) & ((~0ULL) >> n);
         n -= 56;
+
         switch (n)
         {
             case 8:
             {
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 7:
             {
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 6:
             {
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 5:
             {
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 4:
             {
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 3:
             {
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 2:
             {
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
+                nz = *pItr;
             }
             case 1:
             {
-                r = (r << 8) | *pItr;
+                r = (r << 8) | nz;
                 ++pItr;
             }
             case 0:
@@ -257,7 +294,8 @@ namespace VByteCodec
                 BOOST_ASSERT(false);
             }
         }
-        return r;
+        result = r;
+        return true;
     }
 }
 
@@ -319,6 +357,7 @@ public:
     static constexpr unsigned sStorageBits = 60;
     static constexpr uint64_t s2ToThe60 = 1ull << 60;
     static constexpr uint64_t sContinuationBit = 1ull << 63;
+    static constexpr uint64_t sEofMarker = 0;
     static constexpr unsigned sUncompressedBufferCapacity = 256;
     static constexpr unsigned sCompressedBufferCapacity = 4;
 };
@@ -398,6 +437,16 @@ class Simple8bEncode : public Simple8bEncodeBase
 {
     void encodeLargeItem(Item pItem);
 
+    template <typename Dest>
+    void flush(Dest& pDest)
+    {
+        while (mInputPos < mInput.size()) {
+            encodeOnce();
+        }
+        resetInputBuffer();
+        flushOutput(pDest);
+    }
+
 public:
     template <typename Dest>
     void encode(const Item& pItem, Dest& pDest)
@@ -414,13 +463,10 @@ public:
     }
 
     template <typename Dest>
-    void flush(Dest& pDest)
+    void encodeEof(Dest& pDest)
     {
-        while (mInputPos < mInput.size()) {
-            encodeOnce();
-        }
-        resetInputBuffer();
-        flushOutput(pDest);
+        flush(pDest);
+        pDest.push_back(sEofMarker);
     }
 };
 
@@ -450,11 +496,6 @@ protected:
 
     uint64_t mOutputPos = 0;
     TrivialVector<uint64_t, sUncompressedBufferCapacity> mOutput;
-
-public:
-    bool empty() const {
-        return mOutputPos >= mOutput.size();
-    }
 };
 
 
@@ -463,14 +504,20 @@ class Simple8bDecode : public Simple8bDecodeBase
 {
 public:
     template <typename Itr>
-    Item decode(Itr& pItr)
+    bool decode(Itr& pItr, Item& pItem)
     {
         if (mOutputPos < mOutput.size()) {
-            return Item(mOutput[mOutputPos++]);
+            pItem = Item(mOutput[mOutputPos++]);
+            return true;
         }
 
         mOutput.clear();
-        uint64_t decword = decodeWord(*pItr);
+        mOutputPos = 0;
+        auto w = *pItr;
+        if (w == sEofMarker) {
+            return false;
+        }
+        uint64_t decword = decodeWord(w);
         ++pItr;
         if (decword & sContinuationBit) {
             Item item(decword & sStorageMask);
@@ -480,13 +527,12 @@ public:
                 ++pItr;
                 item |= decword & sStorageMask;
             } while (decword & sContinuationBit);
-            mOutputPos = 0;
-            return item;
+            pItem = item;
         }
         else {
-            mOutputPos = 0;
-            return Item(decword);
+            pItem = Item(decword);
         }
+        return true;
     }
 };
 

@@ -42,7 +42,7 @@
 #endif
 
 
-#undef GOSS_CODEC_RUNTIME_CHECKS
+#define GOSS_CODEC_RUNTIME_CHECKS
 #undef GOSS_CODEC_FORCE_VBYTE
 
 namespace Gossamer
@@ -135,7 +135,7 @@ namespace // anonymous
     public:
         uint64_t operator*()
         {
-            return mEof ? 0 : mBuffer;
+            return mBufferValid ? mBuffer : 0;
         }
 
         void operator++()
@@ -149,14 +149,18 @@ namespace // anonymous
             fillBuffer();
         }
 
+        bool good() const {
+            return mBufferValid;
+        }
+
     private:
         std::istream& mFile;
         uint64_t mBuffer;
-        bool mEof;
+        bool mBufferValid;
 
         void fillBuffer() {
             mFile.read((char*)&mBuffer, sizeof(mBuffer));
-            mEof = !mFile.good();
+            mBufferValid = !mFile.eof();
         }
     };
 }
@@ -183,7 +187,7 @@ struct EdgeEncoder<Gossamer::EdgeAndCount>
                            const Gossamer::EdgeAndCount& pItm)
         {
 #ifdef GOSS_CODEC_RUNTIME_CHECKS
-            BOOST_ASSERT(pPrevEdge == ~Gossamer::position_type(0) ||  pPrevEdge <= pItm.first);
+            BOOST_ASSERT(pPrevEdge == ~Gossamer::position_type(0) ||  pPrevEdge < pItm.first);
 #endif
 
             TrivialVector<uint8_t,sizeof(Gossamer::EdgeAndCount) * 9 / 8 + 1> v;
@@ -199,6 +203,13 @@ struct EdgeEncoder<Gossamer::EdgeAndCount>
             pOut.write(reinterpret_cast<const char*>(&v[0]), v.size());
         }
 
+        void encodeEof(std::ostream& pOut)
+        {
+            TrivialVector<uint64_t, 20> v;
+            VByteCodec::encodeEof(v);
+            pOut.write(reinterpret_cast<const char*>(&v[0]), v.size() * sizeof(uint64_t));
+        }
+
         void flush(std::ostream& pOut)
         {
         }
@@ -208,26 +219,27 @@ struct EdgeEncoder<Gossamer::EdgeAndCount>
 template<>
 struct EdgeDecoder<Gossamer::EdgeAndCount>
 {
-    void decode(Gossamer::EdgeAndCount& pItm)
+    bool decode(Gossamer::EdgeAndCount& pItm)
     {
         Gossamer::position_type::value_type d = pItm.first.value();
         std::pair<uint64_t*, uint64_t*> ws = d.words();
         for (uint64_t* i = ws.first; i != ws.second; ++i)
         {
-            *i = VByteCodec::decode(mAdapter);
+            if (!VByteCodec::decode(mAdapter, *i)) {
+                return false;
+            }
         }
         d.add1(pItm.first.value());
         pItm.first = Gossamer::position_type(d);
-        pItm.second = VByteCodec::decode(mAdapter);
+        if (!VByteCodec::decode(mAdapter, pItm.second)) {
+            return false;
+        }
+        return true;
     }
 
     EdgeDecoder(std::istream& pIn)
         : mIn(pIn), mAdapter(pIn)
     {
-    }
-
-    bool good() const {
-        return mIn.good();
     }
 
 private:
@@ -269,13 +281,11 @@ struct EdgeEncoder<Gossamer::position_type>
         pOut.write(reinterpret_cast<const char*>(&v[0]), v.size() * sizeof(encoded_type));
     }
 
-    void flush(std::ostream& pOut)
+    void encodeEof(std::ostream& pOut)
     {
-#ifndef GOSS_CODEC_FORCE_VBYTE
         TrivialVector<uint64_t, 20> v;
-        mEncoder.flush(v);
+        mEncoder.encodeEof(v);
         pOut.write(reinterpret_cast<const char*>(&v[0]), v.size() * sizeof(uint64_t));
-#endif
     }
 
 private:
@@ -294,33 +304,32 @@ struct EdgeDecoder<Gossamer::position_type>
     typedef uint8_t encoded_type;
 #endif
 
-    void decode(Gossamer::position_type& pItm)
+    bool decode(Gossamer::position_type& pItm)
     {
 #ifndef GOSS_CODEC_FORCE_VBYTE
-        auto dec = mDecoder.decode(mAdapter);
+        Gossamer::position_type dec;
+        if (!mDecoder.decode(mAdapter, dec)) {
+            return false;
+        }
         pItm.value().add1(dec.value());
+        return true;
 #else
         Gossamer::position_type::value_type d;
         std::pair<uint64_t*, uint64_t*> ws = d.words();
         for (uint64_t* i = ws.first; i != ws.second; ++i)
         {
-            *i = VByteCodec::decode(mAdapter);
+            if (!VByteCodec::decode(mAdapter, *i)) {
+                return false;
+            }
         }
         pItm.value().add1(d);
+        return true;
 #endif
     }
 
     EdgeDecoder(std::istream& pIn)
         : mIn(pIn), mAdapter(pIn)
     {
-    }
-
-    bool good() const {
-#ifndef GOSS_CODEC_FORCE_VBYTE
-        return !mDecoder.empty() || mIn.good();
-#else
-        return mIn.good();
-#endif
     }
 
 private:

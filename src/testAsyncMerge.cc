@@ -68,7 +68,7 @@ void writeFile(const string& pFn, const vector<Item>& pItems, FileFactory& pFact
         encoder.encode(out, prev, pItems[i]);
         prev = Gossamer::EdgeItemTraits<Item>::edge(pItems[i]);
     }
-    encoder.flush(out);
+    encoder.encodeEof(out);
 }
 
 BOOST_AUTO_TEST_CASE(test1_eac)
@@ -85,13 +85,8 @@ BOOST_AUTO_TEST_CASE(test1_eac)
         Gossamer::EdgeAndCount itm(~Gossamer::position_type(0), 0);
         uint64_t i = 0;
         EdgeDecoder<Gossamer::EdgeAndCount> decoder(in);
-        while (in.good())
+        while (decoder.decode(itm))
         {
-            decoder.decode(itm);
-            if (!in.good())
-            {
-                break;
-            }
             BOOST_CHECK(i < x1.size());
             BOOST_CHECK(x1[i] == itm);
             ++i;
@@ -113,13 +108,8 @@ BOOST_AUTO_TEST_CASE(test1_pt)
         Gossamer::position_type itm = ~Gossamer::position_type(0);
         uint64_t i = 0;
         EdgeDecoder<Gossamer::position_type> decoder(in);
-        while (in.good())
+        while (decoder.decode(itm))
         {
-            decoder.decode(itm);
-            if (!in.good())
-            {
-                break;
-            }
             BOOST_CHECK(i < x1.size());
             BOOST_CHECK(x1[i] == itm);
             ++i;
@@ -128,7 +118,7 @@ BOOST_AUTO_TEST_CASE(test1_pt)
 }
 
 
-BOOST_AUTO_TEST_CASE(test2)
+BOOST_AUTO_TEST_CASE(test2_eac)
 {
     StringFileFactory fac;
 
@@ -175,13 +165,10 @@ BOOST_AUTO_TEST_CASE(test2)
         }
     }
 
-    vector<string> parts;
-    parts.push_back("x1");
-    parts.push_back("x2");
-    vector<uint64_t> sizes;
-    sizes.push_back(x1.size());
-    sizes.push_back(x2.size());
-    AsyncMerge::merge<Graph>(parts, sizes, "x3", 25, x1.size() + x2.size(), 2, 1024, fac);
+    vector<AsyncMerge::Part> parts;
+    parts.emplace_back(0, "x1", x1.size());
+    parts.emplace_back(1, "x2", x2.size());
+    AsyncMerge::merge<Graph>(parts, "x3", 25, x1.size() + x2.size(), 2, 1024, fac);
 
 #if 0
     for (map<string,string>::const_iterator i = fac.files.begin(); i != fac.files.end(); ++i)
@@ -205,7 +192,81 @@ BOOST_AUTO_TEST_CASE(test2)
     }
 }
 
-BOOST_AUTO_TEST_CASE(test3)
+
+BOOST_AUTO_TEST_CASE(test2_pt)
+{
+    StringFileFactory fac;
+
+    vector<Gossamer::position_type> x1;
+    genEdges(17, 65536, x1);
+    writeFile<Gossamer::position_type>("x1", x1, fac);
+
+    vector<Gossamer::position_type> x2;
+    genEdges(18, 65536, x2);
+    writeFile<Gossamer::position_type>("x2", x2, fac);
+
+    vector<Gossamer::position_type> x3;
+    {
+        uint64_t i = 0;
+        uint64_t j = 0;
+        while (i < x1.size() && j < x2.size())
+        {
+            if (x1[i] < x2[j])
+            {
+                x3.push_back(x1[i]);
+                ++i;
+                continue;
+            }
+            if (x1[i] > x2[j])
+            {
+                x3.push_back(x2[j]);
+                ++j;
+                continue;
+            }
+            x3.push_back(x1[i]);
+            ++i;
+            ++j;
+        }
+        while (i < x1.size())
+        {
+            x3.push_back(x1[i]);
+            ++i;
+        }
+        while (j < x2.size())
+        {
+            x3.push_back(x2[j]);
+            ++j;
+        }
+    }
+
+    vector<AsyncMerge::Part> parts;
+    parts.emplace_back(0, "x1", x1.size());
+    parts.emplace_back(1, "x2", x2.size());
+    AsyncMerge::merge<KmerSet,Gossamer::position_type>(parts, "x3", 25, x1.size() + x2.size(), 2, 1024, fac);
+
+#if 0
+    for (map<string, string>::const_iterator i = fac.files.begin(); i != fac.files.end(); ++i)
+    {
+        cout << *i << endl;
+    }
+#endif
+
+    {
+        KmerSet::LazyIterator itr("x3", fac);
+        uint64_t i = 0;
+        while (itr.valid())
+        {
+            BOOST_CHECK(i < x3.size());
+            BOOST_CHECK((*itr).first.value() == x3[i]);
+            ++itr;
+            ++i;
+        }
+        BOOST_CHECK_EQUAL(i, x3.size());
+    }
+}
+
+
+BOOST_AUTO_TEST_CASE(test3_eac)
 {
     StringFileFactory fac;
 
@@ -225,22 +286,54 @@ BOOST_AUTO_TEST_CASE(test3)
     genPairs(20, 32757, x4);
     writeFile("x4", x4, fac);
 
-    vector<string> parts;
-    parts.push_back("x1");
-    parts.push_back("x2");
-    parts.push_back("x3");
-    parts.push_back("x4");
-    vector<uint64_t> sizes;
-    sizes.push_back(x1.size());
-    sizes.push_back(x2.size());
-    sizes.push_back(x3.size());
-    sizes.push_back(x4.size());
-    AsyncMerge::merge<Graph>(parts, sizes, "x0", 25, x1.size() + x2.size() + x3.size() + x4.size(), 1, 256, fac);
+    vector<AsyncMerge::Part> parts;
+    parts.emplace_back(0, "x1", x1.size());
+    parts.emplace_back(1, "x2", x2.size());
+    parts.emplace_back(2, "x3", x3.size());
+    parts.emplace_back(3, "x4", x4.size());
+    AsyncMerge::merge<Graph>(parts, "x0", 25, x1.size() + x2.size() + x3.size() + x4.size(), 1, 256, fac);
+
+#if 0
+    for (map<string, string>::const_iterator i = fac.files.begin(); i != fac.files.end(); ++i)
+    {
+        cout << i->first << '\t' << i->second.size() << endl;
+    }
+#endif
+}
+
+
+
+BOOST_AUTO_TEST_CASE(test3_pt)
+{
+    StringFileFactory fac;
+
+    vector<Gossamer::position_type> x1;
+    genEdges(17, 65533, x1);
+    writeFile("x1", x1, fac);
+
+    vector<Gossamer::position_type> x2;
+    genEdges(18, 65576, x2);
+    writeFile("x2", x2, fac);
+
+    vector<Gossamer::position_type> x3;
+    genEdges(19, 65936, x3);
+    writeFile("x3", x3, fac);
+
+    vector<Gossamer::position_type> x4;
+    genEdges(20, 32757, x4);
+    writeFile("x4", x4, fac);
+
+    vector<AsyncMerge::Part> parts;
+    parts.emplace_back(0, "x1", x1.size());
+    parts.emplace_back(1, "x2", x2.size());
+    parts.emplace_back(2, "x3", x3.size());
+    parts.emplace_back(3, "x4", x4.size());
+    AsyncMerge::merge<KmerSet,Gossamer::position_type>(parts, "x0", 25, x1.size() + x2.size() + x3.size() + x4.size(), 1, 256, fac);
 
 #if 0
     for (map<string,string>::const_iterator i = fac.files.begin(); i != fac.files.end(); ++i)
     {
-        cout << i->first << '\t' << i->second.size() << endl;
+        cout << *i << endl;
     }
 #endif
 }

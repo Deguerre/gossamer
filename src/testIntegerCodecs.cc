@@ -49,7 +49,8 @@ BOOST_AUTO_TEST_CASE(test1a)
     BOOST_CHECK_EQUAL(bytes[0], 0);
 
     vector<uint8_t>::iterator itr(bytes.begin());
-    uint64_t y = VByteCodec::decode(itr, bytes.end());
+    uint64_t y;
+    VByteCodec::decode(itr, y);
     BOOST_CHECK_EQUAL(x, y);
 }
 
@@ -63,7 +64,8 @@ BOOST_AUTO_TEST_CASE(test1b)
     BOOST_CHECK_EQUAL(bytes[0], 1);
 
     vector<uint8_t>::iterator itr(bytes.begin());
-    uint64_t y = VByteCodec::decode(itr, bytes.end());
+    uint64_t y;
+    VByteCodec::decode(itr, y);
     BOOST_CHECK_EQUAL(x, y);
 }
 
@@ -78,7 +80,8 @@ BOOST_AUTO_TEST_CASE(test1c)
     BOOST_CHECK_EQUAL(bytes[1], 0x80);
 
     vector<uint8_t>::iterator itr(bytes.begin());
-    uint64_t y = VByteCodec::decode(itr, bytes.end());
+    uint64_t y;
+    VByteCodec::decode(itr, y);
     BOOST_CHECK_EQUAL(x, y);
 }
 
@@ -92,7 +95,8 @@ BOOST_AUTO_TEST_CASE(test1d_alt)
             
         VByteCodec::encode(x, bytes);
         vector<uint8_t>::iterator itr(bytes.begin());
-        uint64_t y = VByteCodec::decode(itr, bytes.end());
+        uint64_t y;
+        VByteCodec::decode(itr, y);
         BOOST_CHECK_EQUAL(x, y);
     }
 }               
@@ -106,7 +110,8 @@ BOOST_AUTO_TEST_CASE(test2)
 
         VByteCodec::encode(x, bytes);
         vector<uint8_t>::iterator itr(bytes.begin());
-        uint64_t y = VByteCodec::decode(itr, bytes.end());
+        uint64_t y;
+        VByteCodec::decode(itr, y);
         BOOST_CHECK_EQUAL(x, y);
     }
 }
@@ -141,12 +146,13 @@ void testSimple8b(uint64_t pSeed, uint64_t pN, double pProb)
     for (auto x : input) {
         enc.encode(x, output);
     }
-    enc.flush(output);
+    enc.encodeEof(output);
 
     Simple8bDecode<uint64_t> dec;
     auto it = output.begin();
-    while (it != output.end() || !dec.empty()) {
-        decoded.push_back(dec.decode(it));
+    uint64_t codeword;
+    while (dec.decode(it, codeword)) {
+        decoded.push_back(codeword);
     }
 
     BOOST_CHECK_EQUAL(input.size(), decoded.size());
@@ -185,12 +191,13 @@ void testSimple8bBit(uint64_t pSeed, uint64_t pN, uint64_t pBits)
     for (auto x : input) {
         enc.encode(x, output);
     }
-    enc.flush(output);
+    enc.encodeEof(output);
 
     Simple8bDecode<uint64_t> dec;
     auto it = output.begin();
-    while (it != output.end() || !dec.empty()) {
-        decoded.push_back(dec.decode(it));
+    uint64_t codeword;
+    while (dec.decode(it, codeword)) {
+        decoded.push_back(codeword);
     }
 
     BOOST_CHECK_EQUAL(input.size(), decoded.size());
@@ -251,13 +258,14 @@ void testSimple8bKmers(uint64_t pSeed, uint64_t pN, double pP)
         enc.encode(encode, output);
         prev = item;
     }
-    enc.flush(output);
+    enc.encodeEof(output);
 
     Simple8bDecode<Gossamer::position_type> dec;
     Gossamer::position_type item = ~Gossamer::position_type(0);
     auto it = output.begin();
-    while (it != output.end() || !dec.empty()) {
-        item.value().add1(dec.decode(it).value());
+    Gossamer::position_type codeword;
+    while (dec.decode(it, codeword)) {
+        item.value().add1(codeword.value());
         decoded.push_back(item);
     }
 

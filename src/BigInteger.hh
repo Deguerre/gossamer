@@ -249,7 +249,7 @@ public:
             mImpl.mWords[i] = Gossamer::reverseBase4(~mImpl.mWords[Words - i - 1]);
             mImpl.mWords[Words - i - 1] = tmp;
         });
-        if (Words & 1)
+        if constexpr (Words & 1)
         {
             mImpl.mWords[Words/2] = Gossamer::reverseBase4(~mImpl.mWords[Words/2]);
         }

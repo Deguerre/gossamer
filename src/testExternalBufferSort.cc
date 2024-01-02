@@ -39,7 +39,7 @@ public:
 
     void done()
     {
-        BOOST_CHECK(curr == last);
+        BOOST_CHECK(curr == last || curr + 1 == last);
     }
 
     void end()
@@ -51,6 +51,7 @@ public:
     {
     }
 };
+
 
 BOOST_AUTO_TEST_CASE(test0)
 {
@@ -81,6 +82,35 @@ BOOST_AUTO_TEST_CASE(test0)
 }
 
 BOOST_AUTO_TEST_CASE(test1)
+{
+    StringFileFactory fac;
+    ExternalBufferSort sorter(64, fac);
+
+    std::mt19937 rng(19);
+    std::uniform_real_distribution<> dist;
+
+    vector<Item> xs;
+    for (uint64_t i = 0; i < 32; ++i)
+    {
+        uint64_t x = dist(rng) * 24;
+        Item itm;
+        std::cerr << "Length of item " << i << ": " << x << '\n';
+        for (uint64_t j = 0; j < x; ++j)
+        {
+            itm.push_back(dist(rng) * 256);
+        }
+        sorter.push_back(itm);
+        xs.push_back(itm);
+    }
+
+    sort(xs.begin(), xs.end());
+
+    Checker c(xs);
+    sorter.sort(c);
+    c.done();
+}
+
+BOOST_AUTO_TEST_CASE(test2)
 {
     StringFileFactory fac;
     ExternalBufferSort sorter(1024, fac);

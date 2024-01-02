@@ -21,8 +21,18 @@
 class AsyncMerge
 {
 public:
+    struct Part {
+        uint64_t mNumber;
+        std::string mFname;
+        uint64_t mSize;
+
+        Part(uint64_t pNumber, std::string pFname, uint64_t pSize)
+            : mNumber(pNumber), mFname(pFname), mSize(pSize)
+        {
+        }
+    };
     template <typename Kind, typename Item = Gossamer::EdgeAndCount>
-    static void merge(const std::vector<std::string>& pParts, const std::vector<uint64_t>& pSizes,
+    static void merge(const std::vector<Part>& pParts,
                       const std::string& pGraphName,
                       uint64_t pK, uint64_t pN, uint64_t pNumThreads, uint64_t pBufferSize,
                       FileFactory& pFactory);

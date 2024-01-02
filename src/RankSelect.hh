@@ -49,6 +49,8 @@
 #include "Utils.hh"
 #endif
 
+#define GOSS_ORIGINAL_NORMALIZE_HASH
+
 namespace Gossamer
 {
     typedef uint64_t rank_type;
@@ -120,11 +122,33 @@ namespace Gossamer
             mValue.reverseComplement(pK);
         }
 
+#ifdef GOSS_ORIGINAL_NORMALIZE_HASH
+        std::size_t originalHash() const
+        {
+            uint64_t seed = 14695981039346656037ULL;
+            for (int64_t i = 0; i < value_type::sWords; ++i) {
+                auto word = value().words().first[i];
+                for (uint64_t j = 0; j < sizeof(word); ++j)
+                {
+                    seed ^= word & 0xFFULL;
+                    word >>= 8;
+                    seed *= 1099511628211ULL;
+                }
+            }
+            return seed;
+        }
+#endif
+
         bool isNormal(const uint64_t& pK)
         {
             position_type rc(*this);
             rc.reverseComplement(pK);
+#ifdef GOSS_ORIGINAL_NORMALIZE_HASH
+            auto h0 = originalHash();
+            auto h1 = rc.originalHash();
+#else
             auto [h0, h1] = value_type::hash2(this->value(), rc.value());
+#endif
             return (h0 < h1) || ((h0 == h1) && (rc >= *this));
         }
 
@@ -132,7 +156,12 @@ namespace Gossamer
         {
             position_type rc(*this);
             rc.reverseComplement(pK);
+#ifdef GOSS_ORIGINAL_NORMALIZE_HASH
+            auto h0 = originalHash();
+            auto h1 = rc.originalHash();
+#else
             auto [h0, h1] = value_type::hash2(this->value(), rc.value());
+#endif
             if (h0 > h1)
             {
                 *this = rc;

@@ -40,27 +40,27 @@ namespace
     class Loader : public Elem<Item>
     {
     public:
-        std::uint64_t edgesRead() const
+        std::uint64_t edgesRead() const override
         {
             return mEdgesRead;
         }
 
-        std::string label() const
+        std::string label() const override
         {
-            return mFileName;
+            return mPart.mFname;
         }
 
-        const JobManager::Tokens& deps() const
+        const JobManager::Tokens& deps() const override
         {
             return mDeps;
         }
 
-        const std::vector<Item>& items() const
+        const std::vector<Item>& items() const override
         {
             return mItems;
         }
 
-        void moveToFront(const typename std::vector<Item>::const_iterator& pFrom)
+        void moveToFront(const typename std::vector<Item>::const_iterator& pFrom) override
         {
             if (pFrom == mItems.begin())
             {
@@ -76,78 +76,84 @@ namespace
             //cerr << "mItems.size() = " << mItems.size() << endl;
         }
 
-        void fill()
+        void fill() override
         {
-            //std::cerr << "seeked = " << mOffset << endl;
-            //std::cerr << " in.good() = " << in.good() << endl;
-            //std::uint64_t z = mItems.size();
-            //std::cerr << "mItem = " << lexical_cast<string>(mItem.first) << " : " << mItem.second << endl;
-            while (mDecoder.good() && mItems.size() < mNumItems)
+            std::uint64_t z = mItems.size();
+            // std::cerr << "mItem = " << lexical_cast<std::string>(Gossamer::EdgeItemTraits<Item>::edge(mItem)) << endl;
+
+            if (mItems.size() >= mBufferSize || mEof) {
+                return;
+            }
+
+            do
             {
-                mDecoder.decode(mItem);
-                if (!mDecoder.good())
-                {
-                    break;
+                if (!mDecoder.decode(mItem)) {
+                    mEof = true;
+                    return;
                 }
+
                 BOOST_ASSERT(mItems.empty() || mItems.back() < mItem);
                 mItems.push_back(mItem);
-                mEdgesRead++;
+
+                ++mEdgesRead;
             }
-            //cerr << "read " << (mItems.size() - z) << endl;
+            while (mItems.size() < mBufferSize);
+
+            // cerr << "job " << mPart.mNumber << " read " << (mItems.size() - z) << endl;
         }
 
-        Loader(const std::string& pFileName, std::uint64_t pExpectedEdges, std::uint64_t pNumItems, FileFactory& pFactory)
-            : mFactory(pFactory), mFileName(pFileName), mExpectedEdges(pExpectedEdges), mNumItems(pNumItems),
-              mEdgesRead(0), mItem(), mInP(mFactory.in(mFileName)), mDecoder(**mInP)
+        Loader(const AsyncMerge::Part& pPart, uint64_t pBufferSize, FileFactory& pFactory)
+            : mFactory(pFactory), mPart(pPart), mBufferSize(pBufferSize),
+              mEdgesRead(0), mItem(), mInP(mFactory.in(mPart.mFname)), mDecoder(**mInP)
         {
-            mItems.reserve(mNumItems);
+            mItems.reserve(pBufferSize);
             Gossamer::EdgeItemTraits<Item>::edge(mItem) = ~Gossamer::position_type(0);
         }
 
         ~Loader()
         {
-            //cerr << mEdgesRead << '\t' << mExpectedEdges << endl;
-            BOOST_ASSERT(mEdgesRead == mExpectedEdges);
+            // cerr << mPart.mNumber << '\t' << mEdgesRead << '\t' << mPart.mSize << endl;
+            BOOST_ASSERT(mEdgesRead == mPart.mSize);
         }
 
     private:
         FileFactory& mFactory;
-        const std::string mFileName;
-        const std::uint64_t mExpectedEdges;
-        const std::uint64_t mNumItems;
+        const AsyncMerge::Part mPart;
         const JobManager::Tokens mDeps;
+        std::uint64_t mBufferSize;
         std::uint64_t mEdgesRead;
         Item mItem;
         std::vector<Item> mItems;
         FileFactory::InHolderPtr mInP;
         EdgeDecoder<Item> mDecoder;
+        bool mEof = false;
     };
 
     template<typename Item>
     class Merger : public Elem<Item>
     {
     public:
-        std::uint64_t edgesRead() const
+        std::uint64_t edgesRead() const override
         {
             return mLhs->edgesRead() + mRhs->edgesRead();
         }
 
-        std::string label() const
+        std::string label() const override
         {
             return "merger";
         }
 
-        const JobManager::Tokens& deps() const
+        const JobManager::Tokens& deps() const override
         {
             return mDeps;
         }
 
-        const std::vector<Item>& items() const
+        const std::vector<Item>& items() const override
         {
             return mItems;
         }
 
-        void moveToFront(const typename std::vector<Item>::const_iterator& pFrom)
+        void moveToFront(const typename std::vector<Item>::const_iterator& pFrom) override
         {
             if (pFrom == mItems.begin())
             {
@@ -162,7 +168,7 @@ namespace
             mItems.erase(i, mItems.end());
         }
 
-        void fill()
+        void fill() override
         {
             if (mItems.size())
             {
@@ -240,8 +246,8 @@ namespace
             }
         }
 
-        Merger(JobManager& pMgr, const std::shared_ptr<Elem<Item>>& pLhs, const std::shared_ptr<Elem<Item>>& pRhs)
-            : mMgr(pMgr), mLhs(pLhs), mRhs(pRhs)
+        Merger(JobManager& pMgr, uint64_t pBufferSize, const std::shared_ptr<Elem<Item>>& pLhs, const std::shared_ptr<Elem<Item>>& pRhs)
+            : mMgr(pMgr), mBufferSize(pBufferSize), mLhs(pLhs), mRhs(pRhs)
         {
             JobManager::Token lt = mMgr.enqueue(std::bind(&Elem::fill, mLhs.get()), mLhs->deps());
             mDeps.insert(lt);
@@ -252,20 +258,20 @@ namespace
     private:
         JobManager& mMgr;
         JobManager::Tokens mDeps;
+        uint64_t mBufferSize;
         std::shared_ptr<Elem<Item>> mLhs;
         std::shared_ptr<Elem<Item>> mRhs;
         std::vector<Item> mItems;
     };
 
     template<typename Item>
-    std::shared_ptr<Elem<Item>> build(const std::vector<std::string>& pFileNames, const std::vector<std::uint64_t>& pExpectedEdges,
-                  FileFactory& pFactory, std::uint64_t pNumItems, JobManager& pMgr)
+    std::shared_ptr<Elem<Item>> build(const std::vector<AsyncMerge::Part>& pParts,
+                  FileFactory& pFactory, std::uint64_t pBufferSize, JobManager& pMgr)
     {
-        BOOST_ASSERT(pFileNames.size() > 0);
+        BOOST_ASSERT(pParts.size() > 0);
         std::deque<std::shared_ptr<Elem<Item>>> ptrs;
-        for (uint64_t i = 0; i < pFileNames.size(); ++i)
-        {
-            ptrs.push_back(std::shared_ptr<Elem<Item>>(new Loader<Item>(pFileNames[i], pExpectedEdges[i], pNumItems, pFactory)));
+        for (auto& part : pParts) {
+            ptrs.push_back(std::shared_ptr<Elem<Item>>(new Loader<Item>(part, pBufferSize, pFactory)));
         }
         while (ptrs.size() > 1)
         {
@@ -273,7 +279,7 @@ namespace
             ptrs.pop_front();
             std::shared_ptr<Elem<Item>> r = ptrs.front();
             ptrs.pop_front();
-            ptrs.push_back(std::shared_ptr<Elem<Item>>(new Merger<Item>(pMgr, l, r)));
+            ptrs.push_back(std::shared_ptr<Elem<Item>>(new Merger<Item>(pMgr, pBufferSize, l, r)));
             //cerr << "build: " << (void*)ptrs.back().get() << '\t' << (void*)l.get() << '\t' << (void*)r.get() << endl;
         }
         return ptrs.front();
@@ -306,11 +312,11 @@ namespace
 
 template <typename T, typename Item>
 void
-AsyncMerge::merge(const std::vector<std::string>& pParts, const std::vector<std::uint64_t>& pSizes, const std::string& pGraphName,
+AsyncMerge::merge(const std::vector<AsyncMerge::Part>& pParts, const std::string& pGraphName,
                   std::uint64_t pK, std::uint64_t pN, std::uint64_t pNumThreads, std::uint64_t pBufferSize, FileFactory& pFactory)
 {
     JobManager mgr(pNumThreads);
-    std::shared_ptr<Elem<Item>> r = build<Item>(pParts, pSizes, pFactory, pBufferSize, mgr);
+    std::shared_ptr<Elem<Item>> r = build<Item>(pParts, pFactory, pBufferSize, mgr);
     do_merge<T>(mgr, r, pGraphName, pK, pN, pFactory);
     mgr.wait();
 }

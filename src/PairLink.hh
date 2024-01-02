@@ -66,13 +66,11 @@ struct PairLink
     template <typename Itr>
     static void decode(Itr& pItr, PairLink& pLink)
     {
-        pLink.lhs.value() = VByteCodec::decode(pItr);
-
-        pLink.rhs.value() = VByteCodec::decode(pItr);
+        VByteCodec::decode(pItr, pLink.lhs.value());
+        VByteCodec::decode(pItr, pLink.rhs.value());
 
         uint64_t x;
-
-        x = VByteCodec::decode(pItr);
+        VByteCodec::decode(pItr, x);
         if (x & 1)
         {
             pLink.lhsOffset = -static_cast<int64_t>(x >> 1);
@@ -82,7 +80,7 @@ struct PairLink
             pLink.lhsOffset = static_cast<int64_t>(x >> 1);
         }
 
-        x = VByteCodec::decode(pItr);
+        VByteCodec::decode(pItr, x);
         if (x & 1)
         {
             pLink.rhsOffset = -static_cast<int64_t>(x >> 1);

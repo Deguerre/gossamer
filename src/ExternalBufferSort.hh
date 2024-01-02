@@ -41,9 +41,10 @@ public:
         bool operator()(uint8_t const* pLhs, uint8_t const* pRhs)
         {
             uint8_t const* lp = pLhs;
-            uint64_t l = VByteCodec::decode(lp);
+            uint64_t l, r;
+            VByteCodec::decode(lp, l);
             uint8_t const* rp = pRhs;
-            uint64_t r = VByteCodec::decode(rp);
+            VByteCodec::decode(rp, r);
             uint64_t i = 0;
             uint64_t j = 0;
             while (i < l && j < r)
@@ -100,18 +101,22 @@ public:
             mBuffer.insert(mBuffer.end(), pItem.begin(), pItem.end());
         }
 
-        void flush()
+        void flush(bool pLast = false)
         {
-            if (mBuffer.empty())
+            if (!pLast && mBuffer.empty())
             {
                 return;
             }
-            //std::cerr << "flushing " << mFileName << std::endl;
-
+            // std::cerr << "flushing " << mFileName << std::endl;
             FileFactory::OutHolderPtr outp(mFactory.out(mFileName, FileFactory::AppendMode));
             std::ostream& out(**outp);
             out.write(reinterpret_cast<const char*>(&mBuffer[0]), mBuffer.size());
             mBuffer.clear();
+            if (pLast) {
+                TrivialVector<uint8_t, 16> tmp;
+                VByteCodec::encodeEof(tmp);
+                out.write(reinterpret_cast<const char*>(&tmp[0]), tmp.size());
+            }
         }
 
         BufferedFile(uint64_t pBufferSize, const std::string& pFileName, FileFactory& pFactory)
@@ -136,7 +141,7 @@ public:
     template <typename Dest>
     void sort(Dest& pDest)
     {
-        mRoot->flush();
+        mRoot->flush(true);
         mRoot = BufferedFilePtr();
         sort(mFileName, 0, pDest);
         pDest.end();
@@ -165,8 +170,10 @@ private:
                 std::vector<uint8_t const*> perm;
                 for (uint8_t const* p = a.begin(); p != a.end();)
                 {
-                    perm.push_back(p);
-                    uint64_t z = VByteCodec::decode(p, a.end());
+                    uint64_t z;
+                    auto pp = p;
+                    if (!VByteCodec::decode(p, a.end(), z)) break;
+                    perm.push_back(pp);
                     p += z;
                 }
 
@@ -175,7 +182,8 @@ private:
                 for (uint64_t i = 0; i < perm.size(); ++i)
                 {
                     uint8_t const * p = perm[i];
-                    uint64_t z = VByteCodec::decode(p);
+                    uint64_t z;
+                    if (!VByteCodec::decode(p, z)) break;
                     itm.resize(z);
                     for (uint64_t j = 0; j < z; ++j)
                     {
@@ -205,11 +213,8 @@ private:
             std::vector<uint8_t> item;
             while (in.good())
             {
-                uint64_t z = VByteCodec::decode(itr);
-                if (!in.good())
-                {
-                    break;
-                }
+                uint64_t z;
+                if (!VByteCodec::decode(itr, z)) break;
                 item.resize(z);
                 if( z != 0 ) {
                     // if z is zero, &item[0] throws an out of range exception

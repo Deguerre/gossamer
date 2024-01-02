@@ -331,8 +331,7 @@ GossCmdBuildGraph::operator()(const GossCmdContext& pCxt)
     uint64_t prevLoad = 0;
     const uint64_t m = (1 << (mS / 2)) - 1;
     uint64_t z = 0;
-    vector<string> parts;
-    vector<uint64_t> sizes;
+    vector<AsyncMerge::Part> parts;
     string tmp = fac.tmpName();
     while (x.valid())
     {
@@ -366,12 +365,12 @@ GossCmdBuildGraph::operator()(const GossCmdContext& pCxt)
                     uint64_t sz = h.size();
                     double ld = static_cast<double>(sz) / static_cast<double>(cap);
                     log(info, "hash table load at dumping is " + lexical_cast<string>(ld));
-                    string nm = tmp + "-" + lexical_cast<string>(j++);
+                    string nm = tmp + "-" + lexical_cast<string>(j);
                     log(info, "dumping temporary graph " + nm);
                     uint64_t z0 = flushNaked(h, nm, mT, log, fac);
                     z += z0;
-                    parts.push_back(nm);
-                    sizes.push_back(z0);
+                    parts.emplace_back(j, std::move(nm), z0);
+                    ++j;
                     h.clear();
                     nSinceClear = 0;
                     log(info, "done.");
@@ -396,12 +395,12 @@ GossCmdBuildGraph::operator()(const GossCmdContext& pCxt)
     {
         if (h.size() > 0)
         {
-            string nm = tmp + "-" + lexical_cast<string>(j++);
+            string nm = tmp + "-" + lexical_cast<string>(j);
             log(info, "dumping temporary graph " + nm);
             uint64_t z0 = flushNaked(h, nm, mT, log, fac);
+            parts.emplace_back(j, std::move(nm), z0);
             z += z0;
-            parts.push_back(nm);
-            sizes.push_back(z0);
+            ++j;
             h.clear();
             log(info, "done.");
         }
@@ -409,11 +408,11 @@ GossCmdBuildGraph::operator()(const GossCmdContext& pCxt)
         log(info, "merging temporary graphs");
         log(info, "estimated number of edges " + lexical_cast<string>(z));
 
-        AsyncMerge::merge<Graph>(parts, sizes, mGraphName, mK, z, mT, 65536, fac);
+        AsyncMerge::merge<Graph>(parts, mGraphName, mK, z, mT, 65536, fac);
 
         for (uint64_t i = 0; i < parts.size(); ++i)
         {
-            fac.remove(parts[i]);
+            fac.remove(parts[i].mFname);
         }
     }
 
