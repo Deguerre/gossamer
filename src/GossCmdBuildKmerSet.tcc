@@ -234,18 +234,12 @@ namespace {
                 if (pFlushThis) {
                     **dumpFile << std::setfill('0') << std::setw(16) << prev.asUInt64() << '\n';
                 }
-                if (prev.asUInt64() > 0x3ffffffffffe0) {
-                    std::cerr << "Kmer found!\n";
-                }
 
                 bld.push_back(prev);
                 ++n;
                 if (entries) {
                     BOOST_ASSERT(prev < *heap[0]->ii);
                     prev = *heap[0]->ii;
-                    if (prev.asUInt64() > 0x3ffffffffffe0) {
-                        std::cerr << "Magic case found\n";
-                    }
                     // check_heap();
                 }
             }
@@ -253,13 +247,14 @@ namespace {
                 **dumpFile << std::setfill('0') << std::setw(16) << prev.asUInt64() << '\n';
             }
             bld.push_back(prev);
+            bld.end();
         }
         catch (std::ios_base::failure& e)
         {
             BOOST_THROW_EXCEPTION(Gossamer::error()
                 << Gossamer::write_error_info(pGraphName));
         }
-        pLog(info, "wrote " + boost::lexical_cast<std::string>(n) + " pairs.");
+        pLog(info, "wrote " + boost::lexical_cast<std::string>(n) + " kmers.");
         return n;
     }
 

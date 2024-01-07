@@ -42,13 +42,18 @@
 #endif
 
 
-#define GOSS_CODEC_RUNTIME_CHECKS
+#undef GOSS_CODEC_RUNTIME_CHECKS
 #undef GOSS_CODEC_FORCE_VBYTE
 
 namespace Gossamer
 {
     typedef std::pair<position_type,uint64_t> EdgeAndCount;
 
+#ifndef GOSS_CODEC_FORCE_VBYTE
+    typedef uint64_t edge_encoded_t;
+#else
+    typedef uint8_t edge_encoded_t;
+#endif
 
     template<typename Item>
     struct EdgeItemTraits
@@ -205,7 +210,7 @@ struct EdgeEncoder<Gossamer::EdgeAndCount>
 
         void encodeEof(std::ostream& pOut)
         {
-            TrivialVector<uint64_t, 20> v;
+            TrivialVector<uint8_t, 2> v;
             VByteCodec::encodeEof(v);
             pOut.write(reinterpret_cast<const char*>(&v[0]), v.size() * sizeof(uint64_t));
         }
@@ -259,13 +264,8 @@ struct EdgeEncoder<Gossamer::position_type>
         BOOST_ASSERT(pPrevEdge == ~Gossamer::position_type(0) || pPrevEdge <= pItm);
 #endif
 
-#ifndef GOSS_CODEC_FORCE_VBYTE
-        typedef uint64_t encoded_type;
-#else
-        typedef uint8_t encoded_type;
-#endif
 
-        TrivialVector<encoded_type, 20> v;
+        TrivialVector<Gossamer::edge_encoded_t, 20> v;
         Gossamer::position_type d = pItm;
         d.value().subtract1(pPrevEdge.value());
  
@@ -278,14 +278,18 @@ struct EdgeEncoder<Gossamer::position_type>
             VByteCodec::encode(*i, v);
         }
 #endif
-        pOut.write(reinterpret_cast<const char*>(&v[0]), v.size() * sizeof(encoded_type));
+        pOut.write(reinterpret_cast<const char*>(&v[0]), v.size() * sizeof(Gossamer::edge_encoded_t));
     }
 
     void encodeEof(std::ostream& pOut)
     {
-        TrivialVector<uint64_t, 20> v;
+        TrivialVector<Gossamer::edge_encoded_t, 20> v;
+#ifndef GOSS_CODEC_FORCE_VBYTE
         mEncoder.encodeEof(v);
-        pOut.write(reinterpret_cast<const char*>(&v[0]), v.size() * sizeof(uint64_t));
+#else
+        VByteCodec::encodeEof(v);
+#endif
+        pOut.write(reinterpret_cast<const char*>(&v[0]), v.size() * sizeof(Gossamer::edge_encoded_t));
     }
 
 private:

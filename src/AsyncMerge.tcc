@@ -66,14 +66,14 @@ namespace
             {
                 return;
             }
-            //cerr << "loader: moving " << (mItems.end() - pFrom) << " items." << endl;
+            // cerr << "loader: moving " << (mItems.end() - pFrom) << " items." << endl;
             auto i = mItems.begin();
             for (auto j = pFrom; j != mItems.end();)
             {
                 *i++ = *j++;
             }
             mItems.erase(i, mItems.end());
-            //cerr << "mItems.size() = " << mItems.size() << endl;
+            // cerr << "mItems.size() = " << mItems.size() << endl;
         }
 
         void fill() override
@@ -91,10 +91,8 @@ namespace
                     mEof = true;
                     return;
                 }
-
                 BOOST_ASSERT(mItems.empty() || mItems.back() < mItem);
                 mItems.push_back(mItem);
-
                 ++mEdgesRead;
             }
             while (mItems.size() < mBufferSize);
@@ -177,13 +175,12 @@ namespace
 
             const auto& lhs = mLhs->items();
             const auto& rhs = mRhs->items();
-            //cerr << (void*)this << '\t' << "in" << '\t' << lhs.size() << '\t' << rhs.size() << '\t'
-            //        << mItems.size() << endl;
+            // cerr << (void*)this << '\t' << "in" << '\t' << lhs.size() << '\t' << rhs.size() << '\t' << mItems.size() << endl;
             mItems.reserve(mItems.size() + lhs.size() + rhs.size());
             auto l = lhs.begin();
-            //cerr << "lhs.size() = " << lhs.size() << endl;
+            // cerr << "lhs.size() = " << lhs.size() << endl;
             auto r = rhs.begin();
-            //cerr << "rhs.size() = " << rhs.size() << endl;
+            // cerr << "rhs.size() = " << rhs.size() << endl;
             while (l != lhs.end() && r != rhs.end())
             {
                 auto& lkey = Gossamer::EdgeItemTraits<Item>::edge(*l);
@@ -225,22 +222,21 @@ namespace
                 }
             }
 
-            //cerr << (void*)this << '\t' << "out" << '\t' << (lhs.end() - l) << '\t' << (rhs.end() - r) << '\t'
-            //        << mItems.size() << endl;
+            // cerr << (void*)this << '\t' << "out" << '\t' << (lhs.end() - l) << '\t' << (rhs.end() - r) << '\t' << mItems.size() << endl;
             mDeps.clear();
             if (lhs.size() > 0)
             {
-                //cerr << "merger: merged " << (l - lhs.begin()) << " of " << lhs.size() << " lhs items." << endl;
+                // cerr << "merger: merged " << (l - lhs.begin()) << " of " << lhs.size() << " lhs items." << endl;
                 mLhs->moveToFront(l);
-                //cerr << "previously got " << lhs.size() << " items, scheduling " << mLhs->label() << endl;
+                // cerr << "previously got " << lhs.size() << " items, scheduling " << mLhs->label() << endl;
                 JobManager::Token lt = mMgr.enqueue(std::bind(&Elem::fill, mLhs.get()), mLhs->deps());
                 mDeps.insert(lt);
             }
             if (rhs.size() > 0)
             {
-                //cerr << "merger: merged " << (r - rhs.begin()) << " of " << rhs.size() << " rhs items." << endl;
+                // cerr << "merger: merged " << (r - rhs.begin()) << " of " << rhs.size() << " rhs items." << endl;
                 mRhs->moveToFront(r);
-                //cerr << "previously got " << rhs.size() << " items, scheduling " << mRhs->label() << endl;
+                // cerr << "previously got " << rhs.size() << " items, scheduling " << mRhs->label() << endl;
                 JobManager::Token rt = mMgr.enqueue(std::bind(&Elem::fill, mRhs.get()), mRhs->deps());
                 mDeps.insert(rt);
             }
@@ -272,6 +268,7 @@ namespace
         std::deque<std::shared_ptr<Elem<Item>>> ptrs;
         for (auto& part : pParts) {
             ptrs.push_back(std::shared_ptr<Elem<Item>>(new Loader<Item>(part, pBufferSize, pFactory)));
+            // cerr << "leaf: " << (void*)ptrs.back().get() << '\t' << part.mFname << endl;
         }
         while (ptrs.size() > 1)
         {
@@ -280,7 +277,7 @@ namespace
             std::shared_ptr<Elem<Item>> r = ptrs.front();
             ptrs.pop_front();
             ptrs.push_back(std::shared_ptr<Elem<Item>>(new Merger<Item>(pMgr, pBufferSize, l, r)));
-            //cerr << "build: " << (void*)ptrs.back().get() << '\t' << (void*)l.get() << '\t' << (void*)r.get() << endl;
+            // cerr << "branch: " << (void*)ptrs.back().get() << '\t' << (void*)l.get() << '\t' << (void*)r.get() << endl;
         }
         return ptrs.front();
     }
