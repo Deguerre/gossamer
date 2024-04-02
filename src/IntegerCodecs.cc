@@ -9,14 +9,14 @@
 #include "Utils.hh"
 
 namespace {
-	const alignas(16) uint8_t sSimple8bCountTable[16] = {
+	const alignas(16) uint8_t sSimple8bCountTable[16]  = {
         255, 60, 30, 20,
         15, 12, 10, 8,
         7, 6, 5, 4,
         3, 2, 1, 0
 	};
 
-    const alignas(16) uint8_t sSimple8bCountTableSigned[16] = {
+    const alignas(16) int8_t sSimple8bCountTableSigned[16] = {
         255 - 128, 60 - 128, 30 - 128, 20 - 128,
         15 - 128, 12 - 128, 10 - 128, 8 - 128,
         7 - 128, 6 - 128, 5 - 128, 4 - 128,
@@ -24,7 +24,7 @@ namespace {
     };
 
 #if 0
-    const alignas(16) uint8_t sSimple8bBitsTable[16] = {
+    const uint8_t sSimple8bBitsTable[16] alignas(16) = {
         0, 1, 2, 3,
         4, 5, 6, 7,
         8, 10, 12, 15,

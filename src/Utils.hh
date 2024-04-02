@@ -373,7 +373,7 @@ inline uint64_t log2(uint64_t pX)
 }
 
 
-inline uint64_t roundUpToNextPowerOf2(uint64_t pX)
+constexpr inline uint64_t roundUpToNextPowerOf2(uint64_t pX)
 {
     if (pX == 0)
     {

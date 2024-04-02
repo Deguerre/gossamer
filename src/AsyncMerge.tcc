@@ -87,11 +87,17 @@ namespace
 
             do
             {
+                if (mEdgesRead + 3 >= mPart.mSize) {
+                    std::cerr << "Close to end\n";
+                }
                 if (!mDecoder.decode(mItem)) {
                     mEof = true;
                     return;
                 }
                 BOOST_ASSERT(mItems.empty() || mItems.back() < mItem);
+                if (Gossamer::EdgeItemTraits<Item>::edge(mItem).asUInt64() == 0x262DC) {
+                    std::cerr << "Kmer found (async merge load)\n";
+                }
                 mItems.push_back(mItem);
                 ++mEdgesRead;
             }
@@ -110,7 +116,7 @@ namespace
 
         ~Loader()
         {
-            // cerr << mPart.mNumber << '\t' << mEdgesRead << '\t' << mPart.mSize << endl;
+            cerr << mPart.mNumber << '\t' << mEdgesRead << '\t' << mPart.mSize << endl;
             BOOST_ASSERT(mEdgesRead == mPart.mSize);
         }
 
@@ -184,7 +190,15 @@ namespace
             while (l != lhs.end() && r != rhs.end())
             {
                 auto& lkey = Gossamer::EdgeItemTraits<Item>::edge(*l);
+                if (lkey.asUInt64() == 0x262DC) {
+                    std::cerr << "Kmer found (async merge left)\n";
+                }
+
                 auto& rkey = Gossamer::EdgeItemTraits<Item>::edge(*r);
+                if (rkey.asUInt64() == 0x262DC) {
+                    std::cerr << "Kmer found (async merge right)\n";
+                }
+
                 if (lkey < rkey)
                 {
                     BOOST_ASSERT(mItems.empty() || mItems.back() < *l);
@@ -209,6 +223,11 @@ namespace
             {
                 while (r != rhs.end())
                 {
+                    auto& rkey = Gossamer::EdgeItemTraits<Item>::edge(*r);
+                    if (rkey.asUInt64() == 0x262DC) {
+                        std::cerr << "Kmer found (async merge right 2)\n";
+                    }
+
                     mItems.push_back(*r);
                     ++r;
                 }
@@ -217,6 +236,10 @@ namespace
             {
                 while (l != lhs.end())
                 {
+                    auto& lkey = Gossamer::EdgeItemTraits<Item>::edge(*l);
+                    if (lkey.asUInt64() == 0x262DC) {
+                        std::cerr << "Kmer found (async merge left 2)\n";
+                    }
                     mItems.push_back(*l);
                     ++l;
                 }

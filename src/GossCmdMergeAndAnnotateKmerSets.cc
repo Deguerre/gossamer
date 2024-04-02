@@ -227,8 +227,7 @@ GossCmdMergeAndAnnotateKmerSets::operator()(const GossCmdContext& pCxt)
 		n = lhs.count() + rhs.count() - c;
 		BOOST_ASSERT(visited == n);
 
-		log(info, "writing out " + lexical_cast<string>(n) + " kmers.");
-		log(info, "of which " + lexical_cast<string>(c) + " are common.");
+        log(info, "Found that " + lexical_cast<string>(c) + " kmers are common, total of " + lexical_cast<string>(n) + " kmers");
 	}
 
     KmerSet::Builder bld(lhs.K(), mOut, fac, n);

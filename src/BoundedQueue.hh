@@ -39,10 +39,6 @@
 #define STD_ALGORITHM
 #endif
 
-#ifndef DEQUE_HH
-#include "Deque.hh"
-#endif
-
 #ifndef PROPERTIES_HH
 #include "Properties.hh"
 #endif
@@ -156,7 +152,7 @@ public:
 
 private:
     const uint64_t mMaxItems;
-    Deque<T> mItems;
+    std::deque<T> mItems; // XXX Fix to Deque
     bool mFinished;
     std::mutex mMutex;
     std::condition_variable mFullCond;

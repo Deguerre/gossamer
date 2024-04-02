@@ -186,17 +186,17 @@ public:
         if constexpr (sWords == 1) {
             return true;
         }
-
-        if constexpr (sWords == 2) {
+        else if constexpr (sWords == 2) {
             return !mImpl.mWords[1];
         }
-
-        word_type test(0);
-        for (int64_t i = 1; i < Words; ++i)
-        {
-            test |= mImpl.mWords[i];
+        else {
+            word_type test(0);
+            for (int64_t i = 1; i < Words; ++i)
+            {
+                test |= mImpl.mWords[i];
+            }
+            return !test;
         }
-        return !test;
     }
 
     uint64_t asUInt64() const
@@ -465,13 +465,16 @@ public:
             auto l = load_aligned_128(&mImpl.mWords[0]);
             auto r = load_aligned_128(&pRhs.mImpl.mWords[0]);
             store_aligned_128(&mImpl.mWords[0], and_128(l, r));
-            return *this;
         }
+        else {
 #endif
 
-        Gossamer::unrolled_loop<int, Words>([&](auto i) {
-            mImpl.mWords[i] &= pRhs.mImpl.mWords[i];
-        });
+            Gossamer::unrolled_loop<int, Words>([&](auto i) {
+                mImpl.mWords[i] &= pRhs.mImpl.mWords[i];
+                });
+#ifdef GOSS_HAVE_SIMD128
+        }
+#endif
         return *this;
     }
 
@@ -549,23 +552,22 @@ public:
         if constexpr (Words == 1) {
             return mImpl.mWords[0] < pRhs.mImpl.mWords[0];
         }
-
-        if constexpr (Words == 2) {
+        else if constexpr (Words == 2) {
             bool w1eq = mImpl.mWords[1] == pRhs.mImpl.mWords[1];
             bool w1lt = mImpl.mWords[1] < pRhs.mImpl.mWords[1];
             bool w0lt = mImpl.mWords[0] < pRhs.mImpl.mWords[0];
             return w1lt || (w1eq && w0lt);
         }
-
-        for (int64_t i = Words-1; i >= 0; --i)
-        {
-            if (mImpl.mWords[i] == pRhs.mImpl.mWords[i]) {
-                continue;
+        else {
+            for (int64_t i = Words - 1; i >= 0; --i)
+            {
+                if (mImpl.mWords[i] == pRhs.mImpl.mWords[i]) {
+                    continue;
+                }
+                return mImpl.mWords[i] < pRhs.mImpl.mWords[i];
             }
-            return mImpl.mWords[i] < pRhs.mImpl.mWords[i];
+            return false;
         }
-
-        return false;
     }
 
     static bool equalWithMask(const BigInteger& lhs, const BigInteger& rhs, const BigInteger& mask)

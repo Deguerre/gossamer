@@ -115,9 +115,46 @@ namespace {
         };
     };
 
+    uint64_t flushOne(KmerBlock *pBlock, const std::string& pGraphName,
+                        Logger& pLog, FileFactory& pFactory, bool pFlushThis = false)
+    {
+        std::uint64_t n = 0;
+        FileFactory::OutHolderPtr dumpFile;
+        if (pFlushThis) {
+            dumpFile = pFactory.out("flush-graph.txt");
+            **dumpFile << std::hex << std::setprecision(8);
+        }
+        try
+        {
+            NakedGraph::Builder bld(pGraphName, pFactory);
+            for (auto& kmer : *pBlock) {
+                if (pFlushThis) {
+                    **dumpFile << std::setfill('0') << std::setw(16) << kmer.asUInt64() << '\n';
+                }
+                if (kmer.asUInt64() == 0x262DC) {
+                    std::cerr << "Kmer found (non-merge dump)\n";
+                }
+                bld.push_back(kmer);
+                ++n;
+            }
+            bld.end();
+        }
+        catch (std::ios_base::failure& e)
+        {
+            BOOST_THROW_EXCEPTION(Gossamer::error()
+                << Gossamer::write_error_info(pGraphName));
+        }
+        pLog(info, "wrote " + boost::lexical_cast<std::string>(n) + " kmers.");
+        return n;
+    }
+
     uint64_t flushMerge(KmerBlock **pBlocks, unsigned pNumBlocks, const std::string& pGraphName,
                         Logger& pLog, FileFactory& pFactory, bool pFlushThis = false)
     {
+        if (pNumBlocks == 1) {
+            return flushOne(pBlocks[0], pGraphName, pLog, pFactory, pFlushThis);
+        }
+
         struct HeapEntry {
             KmerBlock* block;
             KmerBlock::const_iterator ii, end;
@@ -158,6 +195,10 @@ namespace {
 
         uint32_t n = 0;
         auto prev = *heap[0]->ii;
+        if (prev.asUInt64() == 0x262DC) {
+            std::cerr << "Kmer found (merge phase 1)\n";
+        }
+
 
         auto check_heap = [&]() {
             for (int i = 1; i < entries; ++i) {
@@ -240,6 +281,9 @@ namespace {
                 if (entries) {
                     BOOST_ASSERT(prev < *heap[0]->ii);
                     prev = *heap[0]->ii;
+                    if (prev.asUInt64() == 0x262DC) {
+                        std::cerr << "Kmer found (merge phase 2)\n";
+                    }
                     // check_heap();
                 }
             }
@@ -280,6 +324,9 @@ namespace {
                 // to contain duplicates.
 
                 auto prev = pHash[perm[0]].first;
+                if (prev.asUInt64() == 0x262DC) {
+                    std::cerr << "Kmer found (flushNaked 1)\n";
+                }
                 for (uint32_t i = 1; i < permsize ; ++i)
                 {
                     auto itm = pHash[perm[i]].first;
@@ -296,6 +343,9 @@ namespace {
                     bld.push_back(prev);
                     ++n;
                     prev = itm;
+                    if (prev.asUInt64() == 0x262DC) {
+                        std::cerr << "Kmer found (flushNaked 2)\n";
+                    }
                 }
                 bld.push_back(prev);
                 ++n;
@@ -397,7 +447,15 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
     while (pKmerSrc.valid())
     {
         Gossamer::position_type kmer = *pKmerSrc;
+        if (kmer.asUInt64() == 0x262DC) {
+            std::cerr << "Kmer found (hash 1)\n";
+            Gossamer::position_type kmer = *pKmerSrc;
+        }
         kmer.normalize(mK);
+        if (kmer.asUInt64() == 0x262DC) {
+            std::cerr << "Kmer found (hash 2)\n";
+        }
+
         blk->push_back(kmer);
         if (blk->size() == blkSz)
         {
@@ -470,7 +528,7 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
         
         log(info, "merging temporary graphs");
 
-        AsyncMerge::merge<KmerSet,false>(parts, mKmerSetName, mK, z, mT, 65536, fac);
+        AsyncMerge::merge<KmerSet,Gossamer::position_type>(parts, mKmerSetName, mK, z, mT, 65536, fac);
 
         for (auto& part : parts) {
             fac.remove(part.mFname);
@@ -519,7 +577,13 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
                     // std::cerr << "Thread received " << thisblk << "\n";
 
                     for (auto& kmer : *thisblk) {
+                        if (kmer.asUInt64() == 0x262DC) {
+                            std::cerr << "Kmer found (sort phase)\n";
+                        }
                         kmer.normalize(mK);
+                        if (kmer.asUInt64() == 0x262DC) {
+                            std::cerr << "Kmer found (sort phase)\n";
+                        }
                     }
 
                     Gossamer::sortKmers(mK, *thisblk);
@@ -566,7 +630,7 @@ GossCmdBuildKmerSet::operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc)
         auto this_name = temp_name++;
         std::string nm = tmp + "-" + boost::lexical_cast<std::string>(this_name);
         log(info, "dumping temporary graph " + nm);
-        auto z0 = flushMerge(blocks_to_merge, num_blocks, nm, log, fac);
+        auto z0 = flushMerge(blocks_to_merge, num_blocks, nm, log, fac, true);
         log(info, "dump of " + nm + " done.");
         parts.emplace_back(temp_name, std::move(nm), z0);
         ++temp_name;

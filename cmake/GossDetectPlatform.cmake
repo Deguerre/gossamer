@@ -35,7 +35,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     message(STATUS "The compiler is Clang")
     set(COMPILER_VENDOR "-DGOSS_COMPILER_CLANG")
     set(PLATFORM_CXX_FLAGS
-	    "-Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-float-equal -mavx2 -mpopcnt"
+	    "-Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-float-equal -mavx2 -mpopcnt -madx -mbmi2"
 	)
     set(COMPILER_LDFLAGS "-stdlib=libc++")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")

@@ -14,7 +14,7 @@
 #endif
 
 
-#undef GOSS_BUILD_KMER_SET_WITH_BACKYARD_HASH
+#define GOSS_BUILD_KMER_SET_WITH_BACKYARD_HASH
 
 
 class GossCmdBuildKmerSet : public GossCmd

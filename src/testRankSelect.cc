@@ -9,14 +9,15 @@
 #include <vector>
 #include <algorithm>
 #include <random>
-#include <boost/timer/timer.hpp>
+#include <chrono>
 
 
 #define GOSS_TEST_MODULE TestRankSelect
 #include "testBegin.hh"
 
-
-#undef TIMING_TEST
+#undef BENCHMARK_TEST
+#undef ALSO_BENCHMARK_STDSORT
+#define BENCHMARK_REPS 1000
 
 void
 testKmerSort(uint64_t k, uint64_t N)
@@ -24,10 +25,10 @@ testKmerSort(uint64_t k, uint64_t N)
     std::mt19937 rng(k * N);
     std::uniform_int_distribution<> dist(0, 3);
 
-    std::vector<Gossamer::position_type> vec1;
-    std::vector<Gossamer::position_type> vec2;
-    vec1.reserve(N);
-    vec2.reserve(N);
+    std::vector<Gossamer::position_type> vec_data;
+    std::vector<Gossamer::position_type> vec_gosssort;
+    std::vector<Gossamer::position_type> vec_stdsort;
+    vec_data.reserve(N);
 
     for (auto i = 0; i < N; ++i) {
         Gossamer::position_type kmer;
@@ -35,39 +36,54 @@ testKmerSort(uint64_t k, uint64_t N)
             kmer <<= 2;
             kmer |= dist(rng);
         }
-        vec1.push_back(kmer);
-        vec2.push_back(kmer);
+        vec_data.push_back(kmer);
     }
+    vec_stdsort = vec_data;
     {
-#ifdef TIMING_TEST
-        std::cerr << "Testing Gossamer sort k=" << k << ", N=" << N << "\n";
-        boost::timer::auto_cpu_timer timer;
-#endif
-        Gossamer::sortKmers(k, vec1);
-    }
-    {
-#ifdef TIMING_TEST
+#if defined(BENCHMARK_TEST) && defined(ALSO_BENCHMARK_STDSORT)
         std::cerr << "Testing std::sort k=" << k << ", N=" << N << "\n";
-        boost::timer::auto_cpu_timer timer;
 #endif
-        std::sort(vec2.begin(), vec2.end());
+        const auto start = std::chrono::high_resolution_clock::now();
+        std::sort(vec_stdsort.begin(), vec_stdsort.end());
+        const auto end = std::chrono::high_resolution_clock::now();
+#if defined(BENCHMARK_TEST) && defined(ALSO_BENCHMARK_STDSORT)
+        std::cerr << "Elapsed time: " << std::chrono::duration<double>(end - start).count() << "s\n";
+#endif
     }
+
+#ifdef BENCHMARK_TEST
+    std::cerr << "Testing Gossamer sort k=" << k << ", N=" << N << "\n";
+    std::chrono::duration<double> time;
+    for (unsigned i = 0; i < BENCHMARK_REPS; ++i)
+#endif
+    {
+        vec_gosssort = vec_data;
+        const auto start = std::chrono::high_resolution_clock::now();
+        Gossamer::sortKmers(k, vec_gosssort);
+        const auto end = std::chrono::high_resolution_clock::now();
+#ifdef BENCHMARK_TEST
+        time += std::chrono::duration<double>(end - start);
+#endif
+    }
+#ifdef BENCHMARK_TEST
+    std::cerr << "Average elapsed time: " << (time.count() / BENCHMARK_REPS) << "s\n";
+#endif
     for (int i = 0; i < N; ++i) {
-        BOOST_CHECK_EQUAL(vec1[i], vec2[i]);
+        BOOST_CHECK_EQUAL(vec_stdsort[i], vec_gosssort[i]);
     }
 }
 
 BOOST_AUTO_TEST_CASE(test_kmer_sort)
 {
-#ifdef TIMING_TEST
-    static const size_t sizes[] = { 10, 1000, 10000, 1000000, 100000000 };
+#ifdef BENCHMARK_TEST
+    static const size_t sizes[] = { 1000000, 10000000 };
 #else
-    static const size_t sizes[] = { 10, 1000, 10000, 1000000 };
+    static const size_t sizes[] = { 10, 20, 1000, 10000, 1000000 };
 #endif
     for (auto size : sizes) {
         testKmerSort(27, size);
         testKmerSort(32, size);
-        testKmerSort(36, size);
+        testKmerSort(34, size);
     }
 }
 

@@ -18,7 +18,7 @@ class BackgroundBlockProducer
 {
 public:
     typedef typename Producer::value_type value_type;
-    typedef Deque<value_type> Block;
+    typedef std::deque<value_type> Block; // XXX Deque
     typedef std::shared_ptr<Block> BlockPtr;
 
     class ProdWorker
@@ -27,7 +27,7 @@ public:
         void operator()()
         {
             BlockPtr blk(new Block);
-            blk->reserve(mBlkSz);
+            // blk->reserve(mBlkSz); XXX
 
             while (mProd.valid())
             {
@@ -36,7 +36,7 @@ public:
                 {
                     mQueue.put(blk);
                     blk = BlockPtr(new Block);
-                    blk->reserve(mBlkSz);
+                    // blk->reserve(mBlkSz); XXX
                 }
                 ++mProd;
             }
