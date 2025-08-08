@@ -45,11 +45,18 @@ GossCmdDumpKmerSet::operator()(const GossCmdContext& pCxt)
 
     SmallBaseVector v;
     string s;
+    out << std::hex << std::setprecision(8);
     for (; itr.valid(); ++itr)
     {
         s.clear();
+        auto kmer1 = (*itr).first.value();
+        auto kmer2 = kmer1;
+        kmer2.reverseComplement(itr.K());
         kmerToString(itr.K(), (*itr).first.value(), s);
-        out << s << endl;
+        out << s << '\n';
+        auto k1 = kmer1.asUInt64();
+        auto k2 = kmer2.asUInt64();
+        out << "! " << std::setfill('0') << std::setw(16) << std::min(k1,k2) << ' ' << std::setfill('0') << std::setw(16) << std::max(k1,k2) << '\n';
     }
     log(info, "total elapsed time: " + lexical_cast<string>(t.check()));
 }

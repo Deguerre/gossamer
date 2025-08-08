@@ -16,17 +16,17 @@
 #include <condition_variable>
 #include <mutex>
 #include <thread>
-#include <deque>
 #include <boost/intrusive/list.hpp>
 #include "ThreadGroup.hh"
 #include "TrivialVector.hh"
 #include "Utils.hh"
+#include "Deque.hh"
 
 class WorkQueue : private boost::noncopyable
 {
 public:
     typedef std::function<void (void)> Item;
-    typedef std::deque<Item> Items;
+    typedef Queue<Item> Items;
 
 private:
     class Worker;

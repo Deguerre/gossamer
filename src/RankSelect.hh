@@ -49,7 +49,8 @@
 #include "Utils.hh"
 #endif
 
-#define GOSS_ORIGINAL_NORMALIZE_HASH
+#define GOSS_ORIGINAL_NORMALISE_HASH
+#define GOSS_WITTLER_NORMALISATION
 
 namespace Gossamer
 {
@@ -117,12 +118,12 @@ namespace Gossamer
             mValue.reverse();
         }
 
-        void reverseComplement(const uint64_t& pK)
+        void reverseComplement(uint64_t pK)
         {
             mValue.reverseComplement(pK);
         }
 
-#ifdef GOSS_ORIGINAL_NORMALIZE_HASH
+#ifdef GOSS_ORIGINAL_NORMALISE_HASH
         std::size_t originalHash() const
         {
             uint64_t seed = 14695981039346656037ULL;
@@ -143,7 +144,7 @@ namespace Gossamer
         {
             position_type rc(*this);
             rc.reverseComplement(pK);
-#ifdef GOSS_ORIGINAL_NORMALIZE_HASH
+#ifdef GOSS_ORIGINAL_NORMALISE_HASH
             auto h0 = originalHash();
             auto h1 = rc.originalHash();
 #else
@@ -152,11 +153,17 @@ namespace Gossamer
             return (h0 < h1) || ((h0 == h1) && (rc >= *this));
         }
 
-        void normalize(const uint64_t& pK)
+#ifdef GOSS_WITTLER_NORMALISATION
+        void normalize(const uint64_t pK)
+        {
+            mValue.wittlerCanonicalise(pK);
+        }
+#else
+        void normalize(const uint64_t pK)
         {
             position_type rc(*this);
             rc.reverseComplement(pK);
-#ifdef GOSS_ORIGINAL_NORMALIZE_HASH
+#ifdef GOSS_ORIGINAL_NORMALISE_HASH
             auto h0 = originalHash();
             auto h1 = rc.originalHash();
 #else
@@ -171,6 +178,7 @@ namespace Gossamer
                 *this = rc;
             }
         }
+#endif
 
         position_type normalized(const uint64_t& pK) const
         {

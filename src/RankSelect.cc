@@ -38,13 +38,13 @@ namespace {
 	const std::size_t sSmallRange = 128;
 	const std::size_t sNintherThreshold = 64;
 
-	inline uint64_t
+	GOSS_FORCE_INLINE uint64_t
 	key(uint64_t pWord, const Gossamer::position_type& p1)
 	{
 		return p1.value().words().first[pWord];
 	}
 
-	inline void
+	GOSS_FORCE_INLINE void
 	conditionalSwap(bool condition, Gossamer::position_type& p1, Gossamer::position_type& p2)
 	{
 #ifdef FAST_CONDITIONAL_MOVE_ON_POSITION_TYPES
@@ -58,14 +58,14 @@ namespace {
 #endif
 	}
 
-	inline void
+	GOSS_FORCE_INLINE void
 	sort2(uint64_t pWord, Gossamer::position_type& p1, Gossamer::position_type& p2)
 	{
 		conditionalSwap(key(pWord, p1) > key(pWord, p2), p1, p2);
 	}
 
 	// partialSort3 sorts [p1,p2,p3] assuming that p2 and p3 are already in order.
-	inline void
+	GOSS_FORCE_INLINE void
 	partialSort3(uint64_t pWord, Gossamer::position_type& p1, Gossamer::position_type& p2, Gossamer::position_type& p3)
 	{
 #ifdef FAST_CONDITIONAL_MOVE_ON_POSITION_TYPES
@@ -81,7 +81,7 @@ namespace {
 #endif
 	}
 
-	inline void
+	GOSS_FORCE_INLINE void
     sort3(uint64_t pWord, Gossamer::position_type& p1, Gossamer::position_type& p2, Gossamer::position_type& p3)
 	{
 		sort2(pWord, p2, p3);
@@ -103,16 +103,13 @@ namespace {
 			sort3(0, pBegin[0 * stride], pBegin[1 * stride], pBegin[2 * stride]);
 			break;
 		case 4:
-			sort2(0, pBegin[0 * stride], pBegin[2 * stride]);
-			sort2(0, pBegin[1 * stride], pBegin[3 * stride]);
-			sort2(0, pBegin[0 * stride], pBegin[1 * stride]);
-			sort2(0, pBegin[2 * stride], pBegin[3 * stride]);
-			sort2(0, pBegin[1 * stride], pBegin[2 * stride]);
+			sort2(0, pBegin[0 * stride], pBegin[3 * stride]);
+			sort3(0, pBegin[1 * stride], pBegin[2 * stride], pBegin[3 * stride]);
+			partialSort3(0, pBegin[0 * stride], pBegin[1 * stride], pBegin[2 * stride]);
 			break;
 		case 5:
+			sort3(0, pBegin[2 * stride], pBegin[3 * stride], pBegin[4 * stride]);
 			sort2(0, pBegin[0 * stride], pBegin[1 * stride]);
-			sort2(0, pBegin[3 * stride], pBegin[4 * stride]);
-			partialSort3(0, pBegin[2 * stride], pBegin[3 * stride], pBegin[4 * stride]);
 			sort2(0, pBegin[1 * stride], pBegin[4 * stride]);
 			partialSort3(0, pBegin[0 * stride], pBegin[2 * stride], pBegin[3 * stride]);
 			partialSort3(0, pBegin[1 * stride], pBegin[2 * stride], pBegin[3 * stride]);

@@ -30,7 +30,7 @@ EnumerativeCode<Bits>::EnumerativeCode()
     for (i = 0, previ = s_wordBits*(s_wordBits+1)/2; i < s_wordBits+1;
             ++i, ++previ)
     {
-        mChooseLog2[i] = Gossamer::log2(mChoose[previ]);
+        mChooseLog2[i] = Gossamer::ceilLog2(mChoose[previ]);
     }
 }
 

@@ -13,10 +13,6 @@
 #include "GossCmd.hh"
 #endif
 
-
-#define GOSS_BUILD_KMER_SET_WITH_BACKYARD_HASH
-
-
 class GossCmdBuildKmerSet : public GossCmd
 {
 public:
@@ -27,19 +23,11 @@ public:
     template<typename KmerSrc> void operator()(const GossCmdContext& pCxt, KmerSrc& pKmerSrc);
 
     GossCmdBuildKmerSet(const uint64_t& pK, const uint64_t& pS, const uint64_t& pM,
-                        const uint64_t& pT, const std::string& pKmerSetName)
-        : mK(pK), mS(pS), mM(pM), mT(pT), mKmerSetName(pKmerSetName),
-          mFastaNames(), mFastqNames(), mLineNames()
-    {
-    }
+        const uint64_t& pT, const std::string& pKmerSetName);
 
     GossCmdBuildKmerSet(const uint64_t& pK, const uint64_t& pS, const uint64_t& pM,
-                      const uint64_t& pT, const std::string& pKmerSetName,
-                      const strings& pFastaNames, const strings& pFastqNames, const strings& pLineNames)
-        : mK(pK), mS(pS), mM(pM), mT(pT), mKmerSetName(pKmerSetName),
-          mFastaNames(pFastaNames), mFastqNames(pFastqNames), mLineNames(pLineNames)
-    {
-    }
+        const uint64_t& pT, const std::string& pKmerSetName,
+        const strings& pFastaNames, const strings& pFastqNames, const strings& pLineNames);
 
 private:
     const uint64_t mK;
@@ -59,7 +47,5 @@ public:
 
     GossCmdFactoryBuildKmerSet();
 };
-
-#include "GossCmdBuildKmerSet.tcc"
 
 #endif // GOSSCMDBUILDKMERSET_HH

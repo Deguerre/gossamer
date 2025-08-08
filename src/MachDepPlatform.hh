@@ -77,8 +77,17 @@
 
 #ifdef GOSS_CPU_X64
 #define GOSS_EXT_SSE2
+
+#ifdef __AVX__
 #define GOSS_EXT_SSSE3
+#define GOSS_EXT_SSE41
 #define GOSS_EXT_AVX
+#endif
+
+#ifdef __AVX2__
+#define GOSS_EXT_AVX2
+#define GOSS_EXT_BMI2
+#endif
 
 namespace Gossamer {
 	inline bool add64(uint64_t pA, uint64_t pB, bool pCarryIn, uint64_t& pResult)
@@ -115,8 +124,22 @@ namespace Gossamer {
 		_mm_prefetch((const char*)addr, _MM_HINT_T2);
 	}
 
+	// Relax the CPU. On Intel, this is the pause instruction.
 	inline void cpu_relax() {
 		_mm_pause();
+	}
+
+	// This function should compile to no instructions, however acts as
+	// as a barrier to the compiler optimiser:
+	// 
+	//     - It is not optimised away.
+	//     - Loads and stores are not moved across the call.
+	inline void	optimisation_barrier() {
+#ifdef GOSS_COMPILER_MSVC
+		_ReadWriteBarrier();
+#else
+		asm volatile("" : : : "memory");
+#endif
 	}
 
 	inline uint64_t byte_swap_64(uint64_t x) {
@@ -126,6 +149,26 @@ namespace Gossamer {
 		return _bswap64(x);
 #endif
 	}
+
+	inline unsigned log2(uint64_t x) {
+#ifdef GOSS_COMPILER_MSVC
+		unsigned long index;
+		return _BitScanReverse64(&index, x) ? index : 0;
+#else
+		auto bsr = 63 - __builtin_clzll(x)
+		return x ? bsr : 0;
+#endif
+	}
+
+
+#ifdef GOSS_EXT_BMI2
+#define GOSS_HAVE_PLATFORM_SELECT
+	inline uint64_t platform_select(uint64_t pWord, uint64_t pR)
+	{
+		uint64_t bit = _pdep_u64(uint64_t(1) << pR, pWord);
+		return _tzcnt_u64(bit);
+	}
+#endif
 }
 
 #endif
@@ -174,6 +217,10 @@ namespace Gossamer {
 		__pldx(1, 2, 0, (void const volatile*)addr);
 	}
 
+	inline void	optimisation_barrier() {
+		asm volatile("" : : : "memory");
+	}
+
 	inline void cpu_relax() {
 		__yield();
 	}
@@ -184,7 +231,6 @@ namespace Gossamer {
 }
 
 #endif
-
 
 
 #endif

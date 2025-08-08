@@ -51,15 +51,9 @@
 #include "NumericConversionUtil.hh"
 #endif // NUMERIC_CONVERSION_UTIL_HH
 
-#undef GOSS_NO_SIMD
-
-#if defined(GOSS_EXT_SSE2)
-#include "MachDepSSE.hh"
-#elif defined(GOSS_EXT_NEON)
-#include "MachDepNeon.hh"
-#else
-#include "MachDepNoSimd.hh"
-#endif
+#ifndef MACHDEPSIMD_HH
+#include "MachDepSimd.hh"
+#endif // MACHDEPSIMD_HH
 
 
 /**
@@ -175,9 +169,10 @@ public:
     bool boolean_test() const
     {
         word_type test(0);
-        Gossamer::unrolled_loop<int, Words>([&](auto i) {
+#pragma unroll
+        for (int i = 0; i < Words; ++i) {
             test |= mImpl.mWords[i];
-        });
+        }
         return test != 0;
     }
 
@@ -191,7 +186,8 @@ public:
         }
         else {
             word_type test(0);
-            for (int64_t i = 1; i < Words; ++i)
+#pragma unroll
+            for (int i = 1; i < Words; ++i)
             {
                 test |= mImpl.mWords[i];
             }
@@ -213,21 +209,22 @@ public:
     {
         double scale = static_cast<double>(std::numeric_limits<word_type>::max()) + 1;
         double value = 0;
-        Gossamer::unrolled_loop<int, Words>([&](auto j) {
-            auto i = Words - 1 - j;
+#pragma unroll
+        for (int i = Words - 1; i >= 0; --i) {
             value = value * scale + mImpl.mWords[i];
-        });
+        }
         return value;
     }
 
     /// Reverse two-bit sequences.
     void reverse()
     {
-        Gossamer::unrolled_loop<int, Words / 2>([&](auto i) {
+#pragma unroll
+        for (int i = 0; i < Words / 2; ++i) {
             word_type tmp = Gossamer::reverseBase4(mImpl.mWords[i]);
             mImpl.mWords[i] = Gossamer::reverseBase4(mImpl.mWords[Words - i - 1]);
             mImpl.mWords[Words - i - 1] = tmp;
-        });
+        }
     }
 
     /// Reverse complement.
@@ -244,35 +241,344 @@ public:
         }
 #endif
 
-        Gossamer::unrolled_loop<int, Words/2>([&](auto i) {
+#pragma unroll
+        for (int i = 0; i < Words / 2; ++i) {
             word_type tmp = Gossamer::reverseBase4(~mImpl.mWords[i]);
             mImpl.mWords[i] = Gossamer::reverseBase4(~mImpl.mWords[Words - i - 1]);
             mImpl.mWords[Words - i - 1] = tmp;
-        });
+        }
         if constexpr (Words & 1)
         {
             mImpl.mWords[Words/2] = Gossamer::reverseBase4(~mImpl.mWords[Words/2]);
         }
         *this >>= sBits - 2*pK;
     }
-    
+
+
+    /// True if the k-mer is canonical by Wittler's method
+    bool wittlerCanonical(uint64_t pK)
+    {
+        BigInteger y(*this);
+        y.reverseComplement(pK);
+
+        bool found = false;
+        bool xIsReverseComplement = true;
+#pragma unroll
+        for (int i = Words - 1; i >= 0; --i) {
+            auto wx = mImpl.mWords[i];
+            auto wy = y.mImpl.mWords[i];
+            auto w = wx ^ wy;
+            w |= (w & 0x5555555555555555ull) << 1;
+            auto bitpos = BigInteger::sBitsPerWord - Gossamer::count_leading_zeroes(w) - 2;
+            auto mask = word_type(0x3) << bitpos;
+            bool xNtIsLess = (wx & mask) < (wy & mask);
+            if (w && !found) {
+                found = true;
+                xIsReverseComplement = xNtIsLess;
+            }
+        }
+        return xIsReverseComplement;
+    }
+
+
+    /// Canonicalise a kmer by Wittler's method
+    void wittlerCanonicalise(uint64_t pK)
+    {
+        BigInteger y(*this);
+        y.reverseComplement(pK);
+
+        bool found = false;
+        bool xIsReverseComplement = true;
+#pragma unroll
+        for (int i = Words - 1; i >= 0; --i) {
+            auto wx = mImpl.mWords[i];
+            auto wy = y.mImpl.mWords[i];
+            auto w = wx ^ wy;
+            w |= (w & 0x5555555555555555ull) << 1;
+            auto bitpos = BigInteger::sBitsPerWord - Gossamer::count_leading_zeroes(w) - 2;
+            auto mask = word_type(0x3) << bitpos;
+            bool xNtIsLess = (wx & mask) < (wy & mask);
+            if (w && !found) {
+                found = true;
+                xIsReverseComplement = xNtIsLess;
+            }
+        }
+        if (!xIsReverseComplement) {
+            *this = y;
+        }
+    }
+
+
+    /// Encode a canonical k-mer using Wittler's method
+    BigInteger wittlerEncode(uint64_t pK)
+    {
+        BigInteger code;
+
+        BigInteger y(*this);
+        y.reverseComplement(pK);
+
+        uint64_t i = 0;
+        for (; i < pK/2; ++i) {
+            auto bit = (pK - i - 1) * 2;
+            auto w = bit / BigInteger::sBitsPerWord;
+            auto b = bit % BigInteger::sBitsPerWord;
+            auto l = (mImpl.mWords[w] >> b) & 3;
+            auto r = (y.mImpl.mWords[w] >> b) & 3;
+            if (l < r) {
+                break;
+            }
+
+            {
+                auto w = (i * 2) / BigInteger::sBitsPerWord;
+                auto b = (i * 2) % BigInteger::sBitsPerWord;
+                code.mImpl.mWords[w] |= uint64_t(r) << b;
+            }
+        }
+
+        if (2 * i + 1 == pK) {
+            auto bit = (pK - i - 1) * 2;
+            auto w = bit / BigInteger::sBitsPerWord;
+            auto b = bit % BigInteger::sBitsPerWord;
+            auto r = (y.mImpl.mWords[w] >> b) & 3;
+            code.mImpl.mWords[w] |= uint64_t(r) << b;
+        }
+        else if (i < pK / 2) {
+            auto bit = (pK - i - 1) * 2;
+            auto w = bit / BigInteger::sBitsPerWord;
+            auto b = bit % BigInteger::sBitsPerWord;
+            auto l = (mImpl.mWords[w] >> b) & 3;
+            auto r = (y.mImpl.mWords[w] >> b) & 3;
+
+            auto rank = (5 - l) * l / 2 + r - 1;
+            auto rank_l = rank / 4 + 1;
+            auto rank_r = rank % 4;
+            code.mImpl.mWords[w] |= uint64_t(rank_l) << b;
+
+            {
+                auto bit = (pK - i - 2) * 2;
+                auto w = bit / BigInteger::sBitsPerWord;
+                auto b = bit % BigInteger::sBitsPerWord;
+                code.mImpl.mWords[w] |= uint64_t(rank_r) << b;
+            }
+
+            BigInteger remainder(*this);
+            remainder >>= 2;
+            for (auto r = i + 1; r < pK - i - 1; ++r) {
+                auto bit = (pK - r - 2) * 2;
+                auto w = bit / BigInteger::sBitsPerWord;
+                auto b = bit % BigInteger::sBitsPerWord;
+                auto x = remainder.mImpl.mWords[w] & (uint64_t(3) << b);
+                code.mImpl.mWords[w] |= x;
+            }
+        }
+
+//        std::cerr << "Pre-adjust code: " << code.asUInt64() << '\n';
+
+        auto k1 = pK - i - 1;
+        auto k2 = (pK + 1) / 2;
+        if (k1 > k2) {
+            BigInteger missing_1(1);
+            missing_1 <<= k1 * 2;
+            BigInteger missing_2(1);
+            missing_2 <<= k2 * 2;
+            missing_1 -= missing_2;
+            missing_1 >>= 1;
+            code -= missing_1;
+        }
+
+//        std::cerr << "Pre-midadjust code: " << code.asUInt64() << '\n';
+
+        if (pK % 2 == 1) {
+            BigInteger midadjust(1);
+            midadjust <<= ((pK + 1) & ~uint64_t(1)) - 1;
+            code -= midadjust;
+        }
+//        std::cerr << "Post-adjust code: " << code.asUInt64() << '\n';
+
+        return code;
+    }
+
+#if 0
+    /// Decode a canonical k-mer using Wittler's method
+    BigInteger wittlerDecode(uint64_t pK)
+    {
+        BigInteger kmer;
+        BigInteger decode(*this);
+        std::cerr << "Pre-midadjust decode: " << decode.asUInt64() << '\n';
+        if (pK % 2 == 1) {
+            BigInteger midadjust(1);
+            midadjust <<= ((pK + 1) & ~uint64_t(1)) - 1;
+            decode += midadjust;
+        }
+        std::cerr << "Post-midadjust decode: " << decode.asUInt64() << '\n';
+
+        uint64_t i = 0;
+        unsigned rankl;
+        bool found_i = false;
+        do {
+            auto bitl = (pK - i - 1) * 2;
+            auto wl = bitl / BigInteger::sBitsPerWord;
+            auto bl = bitl % BigInteger::sBitsPerWord;
+            rankl = (decode.mImpl.mWords[wl] >> bl) & 3;
+            if (rankl) {
+                found_i = true;
+                break;
+            }
+            auto bitr = i * 2;
+            auto wr = bitr / BigInteger::sBitsPerWord;
+            auto br = bitr % BigInteger::sBitsPerWord;
+            auto symr = (decode.mImpl.mWords[wr] >> br) & 3;
+            auto syml = (~uint64_t(symr)) & 3;
+            kmer.mImpl.mWords[wr] |= (syml << br);
+            kmer.mImpl.mWords[wl] |= (symr << bl);
+            ++i;
+        }  while (i < pK / 2);
+
+        auto k1 = pK - i - 1;
+        auto k2 = (pK + 1) / 2;
+        if (k1 > k2) {
+            BigInteger missing_1(1);
+            missing_1 <<= k1 * 2;
+            BigInteger missing_2(1);
+            missing_2 <<= k2 * 2;
+            missing_1 -= missing_2;
+            missing_1 >>= 1;
+            decode += missing_1;
+        }
+        std::cerr << "Post-adjust decode: " << decode.asUInt64() << '\n';
+
+        if (found_i) {
+            auto bitr = (pK - i - 2) * 2;
+            auto wr = bitr / BigInteger::sBitsPerWord;
+            auto br = bitr % BigInteger::sBitsPerWord;
+            auto rankr = (decode.mImpl.mWords[wr] >> br) & 3;
+            auto rank = (rankl - 1) * 4 + rankr;
+            uint64_t syml = 0, symr = 0;
+            switch (rank) {
+            case 0: syml = 0; symr = 2; break;
+            case 1: syml = 0; symr = 1; break;
+            case 2: syml = 0; symr = 0; break;
+            case 3: syml = 1; symr = 1; break;
+            case 4: syml = 1; symr = 0; break;
+            case 5: syml = 2; symr = 0; break;
+            }
+            {
+                auto bitl = (pK - i - 1) * 2;
+                auto wl = bitl / BigInteger::sBitsPerWord;
+                auto bl = bitl % BigInteger::sBitsPerWord;
+                kmer.mImpl.mWords[wl] |= syml << bl;
+                auto bitr = i * 2;
+                auto wr = bitr / BigInteger::sBitsPerWord;
+                auto br = bitr % BigInteger::sBitsPerWord;
+                kmer.mImpl.mWords[wr] |= symr << br;
+            }
+
+            for (auto j = i + 1; j < pK - i - 1; ++j) {
+                auto bitf = (pK - j - 2) * 2;
+                auto wf = bitf / BigInteger::sBitsPerWord;
+                auto bf = bitf % BigInteger::sBitsPerWord;
+                auto bitt = (pK - j - 1) * 2;
+                auto wt = bitt / BigInteger::sBitsPerWord;
+                auto bt = bitt % BigInteger::sBitsPerWord;
+                auto sym = (decode.mImpl.mWords[wf] >> bf) & 3;
+                kmer.mImpl.mWords[wt] |= (sym << bt);
+            }
+            std::cerr << decode.asUInt64() << ' ' << i << ' ' << kmer.asUInt64() << '\n';
+        }
+        else if (2*i + 1 == pK) {
+            // Middle symbol
+            auto bit = i * 2;
+            auto w = bit / BigInteger::sBitsPerWord;
+            auto b = bit % BigInteger::sBitsPerWord;
+            kmer.mImpl.mWords[w] |= ~decode.mImpl.mWords[w] & (3 << b);
+            std::cerr << decode.asUInt64() << ' ' << i << ' ' << "mid" << '\n';
+        }
+        else {
+            std::cerr << decode.asUInt64() << ' ' << i << ' ' << "other" << '\n';
+        }
+
+#if 0
+
+        BigInteger y(*this);
+        y.reverseComplement(pK);
+
+        uint64_t i = 0;
+        for (; i < pK / 2; ++i) {
+            auto bit = (pK - i - 1) * 2;
+            auto w = bit / BigInteger::sBitsPerWord;
+            auto b = bit % BigInteger::sBitsPerWord;
+            auto l = (mImpl.mWords[w] >> b) & 3;
+            auto r = (y.mImpl.mWords[w] >> b) & 3;
+            if (l < r) {
+                break;
+            }
+
+            {
+                auto w = (i * 2) / BigInteger::sBitsPerWord;
+                auto b = (i * 2) % BigInteger::sBitsPerWord;
+                code.mImpl.mWords[w] |= uint64_t(r) << b;
+            }
+        }
+
+        if (2 * i + 1 == pK) {
+            auto bit = (pK - i - 1) * 2;
+            auto w = bit / BigInteger::sBitsPerWord;
+            auto b = bit % BigInteger::sBitsPerWord;
+            auto r = (y.mImpl.mWords[w] >> b) & 3;
+            code.mImpl.mWords[w] |= uint64_t(r) << b;
+        }
+        else if (i < pK / 2) {
+            auto bit = (pK - i - 1) * 2;
+            auto w = bit / BigInteger::sBitsPerWord;
+            auto b = bit % BigInteger::sBitsPerWord;
+            auto l = (mImpl.mWords[w] >> b) & 3;
+            auto r = (y.mImpl.mWords[w] >> b) & 3;
+
+            auto rank = (5 - l) * l / 2 + r - 1;
+            auto rank_l = rank / 4 + 1;
+            auto rank_r = rank % 4;
+            code.mImpl.mWords[w] |= uint64_t(rank_l) << b;
+
+            {
+                auto bit = (pK - i - 2) * 2;
+                auto w = bit / BigInteger::sBitsPerWord;
+                auto b = bit % BigInteger::sBitsPerWord;
+                code.mImpl.mWords[w] |= uint64_t(rank_r) << b;
+            }
+
+            BigInteger remainder(*this);
+            remainder >>= 2;
+            for (auto r = i + 1; r < pK - i - 1; ++r) {
+                auto bit = (pK - r - 2) * 2;
+                auto w = bit / BigInteger::sBitsPerWord;
+                auto b = bit % BigInteger::sBitsPerWord;
+                auto x = remainder.mImpl.mWords[w] & (uint64_t(3) << b);
+                code.mImpl.mWords[w] |= x;
+            }
+        }
+
+#endif
+        return kmer;
+    }
+#endif
+
     BigInteger& operator+=(uint64_t pRhs)
     {
         bool carry = Gossamer::add64(mImpl.mWords[0], pRhs, false, mImpl.mWords[0]);
-        Gossamer::unrolled_loop<int, Words - 1>([&](auto j) {
-            auto i = j + 1;
+#pragma unroll
+        for (int i = 1; i < Words; ++i) {
             carry = Gossamer::add64(mImpl.mWords[i], 0, carry, mImpl.mWords[i]);
-        });
+        }
         return *this;
     }
 
     BigInteger& operator+=(const BigInteger& pRhs)
     {
         bool carry = Gossamer::add64(mImpl.mWords[0], pRhs.mImpl.mWords[0], false, mImpl.mWords[0]);
-        Gossamer::unrolled_loop<int, Words - 1>([&](auto j) {
-            auto i = j + 1;
+#pragma unroll
+        for (int i = 1; i < Words; ++i) {
             carry = Gossamer::add64(mImpl.mWords[i], pRhs.mImpl.mWords[i], carry, mImpl.mWords[i]);
-        });
+        }
         return *this;
     }
 
@@ -280,10 +586,10 @@ public:
     BigInteger& add1(uint64_t pRhs)
     {
         bool carry = Gossamer::add64(mImpl.mWords[0], pRhs, true, mImpl.mWords[0]);
-        Gossamer::unrolled_loop<int, Words - 1>([&](auto j) {
-            auto i = j + 1;
+#pragma unroll
+        for (int i = 1; i < Words; ++i) {
             carry = Gossamer::add64(mImpl.mWords[i], 0, carry, mImpl.mWords[i]);
-        });
+        }
         return *this;
     }
 
@@ -291,30 +597,30 @@ public:
     BigInteger& add1(const BigInteger& pRhs)
     {
         bool carry = Gossamer::add64(mImpl.mWords[0], pRhs.mImpl.mWords[0], true, mImpl.mWords[0]);
-        Gossamer::unrolled_loop<int, Words - 1>([&](auto j) {
-            auto i = j + 1;
+#pragma unroll
+        for (int i = 1; i < Words; ++i) {
             carry = Gossamer::add64(mImpl.mWords[i], pRhs.mImpl.mWords[i], carry, mImpl.mWords[i]);
-            });
+        }
         return *this;
     }
 
     BigInteger& operator-=(uint64_t pRhs)
     {
         bool carry = Gossamer::sub64(mImpl.mWords[0], pRhs, false, mImpl.mWords[0]);
-        Gossamer::unrolled_loop<int, Words - 1>([&](auto j) {
-            auto i = j + 1;
+#pragma unroll
+        for (int i = 1; i < Words; ++i) {
             carry = Gossamer::sub64(mImpl.mWords[i], 0, carry, mImpl.mWords[i]);
-        });
+        }
         return *this;
     }
 
     BigInteger& operator-=(const BigInteger& pRhs)
     {
         bool carry = Gossamer::sub64(mImpl.mWords[0], pRhs.mImpl.mWords[0], false, mImpl.mWords[0]);
-        Gossamer::unrolled_loop<int, Words - 1>([&](auto j) {
-            auto i = j + 1;
+#pragma unroll
+        for (int i = 1; i < Words; ++i) {
             carry = Gossamer::sub64(mImpl.mWords[i], pRhs.mImpl.mWords[i], carry, mImpl.mWords[i]);
-        });
+        }
         return *this;
     }
 
@@ -322,10 +628,10 @@ public:
     BigInteger& subtract1(const BigInteger& pRhs)
     {
         bool carry = Gossamer::sub64(mImpl.mWords[0], pRhs.mImpl.mWords[0], true, mImpl.mWords[0]);
-        Gossamer::unrolled_loop<int, Words - 1>([&](auto j) {
-            auto i = j + 1;
+#pragma unroll
+        for (int i = 1; i < Words; ++i) {
             carry = Gossamer::sub64(mImpl.mWords[i], pRhs.mImpl.mWords[i], carry, mImpl.mWords[i]);
-            });
+        }
         return *this;
     }
 
@@ -356,19 +662,21 @@ public:
         }
 
         int64_t wordShift = pShift / sBitsPerWord;
-        Gossamer::unrolled_loop<int, Words>([&](auto j) {
-            auto i = Words - 1 - j;
-            mImpl.mWords[i] = i >= wordShift ? mImpl.mWords[i - wordShift] : word_type(0);
-        });
+#pragma unroll
+        for (int i = Words - 1; i >= 0; --i) {
+            auto sw = mImpl.mWords[i - wordShift];
+            mImpl.mWords[i] = i >= wordShift ? sw : word_type(0);
+        }
         pShift -= wordShift * sBitsPerWord;
 
         if (pShift > 0) {
             word_type carry = 0;
-            Gossamer::unrolled_loop<int, Words>([&](auto i) {
+#pragma unroll
+            for (int i = 0; i < Words; ++i) {
                 word_type nextCarry = mImpl.mWords[i] >> (sBitsPerWord - pShift);
                 mImpl.mWords[i] = (mImpl.mWords[i] << pShift) | carry;
                 carry = nextCarry;
-            });
+            }
         }
 
         return *this;
@@ -401,20 +709,22 @@ public:
         }
 
         int64_t wordShift = pShift / sBitsPerWord;
-        Gossamer::unrolled_loop<int, Words>([&](auto i) {
-            mImpl.mWords[i] = i + wordShift < Words ? mImpl.mWords[i + wordShift] : word_type(0);
-        });
+#pragma unroll
+        for (int i = 0; i < Words; ++i) {
+            auto sw = mImpl.mWords[i + wordShift];
+            mImpl.mWords[i] = i + wordShift < Words ? sw : word_type(0);
+        }
         pShift -= wordShift * sBitsPerWord;
 
         if (pShift > 0)
         {
             word_type carry = 0;
-            Gossamer::unrolled_loop<int, Words>([&](auto j) {
-                auto i = Words - 1 - j;
+#pragma unroll
+            for (int i = Words - 1; i >= 0; --i) {
                 word_type nextCarry = mImpl.mWords[i] << (sBitsPerWord - pShift);
                 mImpl.mWords[i] = (mImpl.mWords[i] >> pShift) | carry;
                 carry = nextCarry;
-            });
+            }
         }
 
         return *this;
@@ -438,9 +748,10 @@ public:
         }
 #endif
 
-        Gossamer::unrolled_loop<int, Words>([&](auto i) {
+#pragma unroll
+        for (int i = 0; i < Words; ++i) {
             mImpl.mWords[i] |= pRhs.mImpl.mWords[i];
-        });
+        }
         return *this;
     }
 
@@ -465,16 +776,13 @@ public:
             auto l = load_aligned_128(&mImpl.mWords[0]);
             auto r = load_aligned_128(&pRhs.mImpl.mWords[0]);
             store_aligned_128(&mImpl.mWords[0], and_128(l, r));
-        }
-        else {
-#endif
-
-            Gossamer::unrolled_loop<int, Words>([&](auto i) {
-                mImpl.mWords[i] &= pRhs.mImpl.mWords[i];
-                });
-#ifdef GOSS_HAVE_SIMD128
+            return *this;
         }
 #endif
+#pragma unroll
+        for (int i = 0; i < Words; ++i) {
+            mImpl.mWords[i] &= pRhs.mImpl.mWords[i];
+        }
         return *this;
     }
 
@@ -489,36 +797,38 @@ public:
             return *this;
         }
 #endif
-        Gossamer::unrolled_loop<int, Words>([&](auto i) {
+#pragma unroll
+        for (int i = 0; i < Words; ++i) {
             mImpl.mWords[i] ^= pRhs.mImpl.mWords[i];
-        });
+        }
         return *this;
     }
 
     BigInteger& operator++()
     {
         bool carry = Gossamer::add64(mImpl.mWords[0], 0, true, mImpl.mWords[0]);
-        Gossamer::unrolled_loop<int, Words - 1>([&](auto j) {
-            auto i = j + 1;
+#pragma unroll
+        for (int i = 1; i < Words; ++i) {
             carry = Gossamer::add64(mImpl.mWords[i], 0, carry, mImpl.mWords[i]);
-        });
+        }
         return *this;
     }
 
     BigInteger& operator--()
     {
         bool carry = Gossamer::sub64(mImpl.mWords[0], 0, true, mImpl.mWords[0]);
-        Gossamer::unrolled_loop<int, Words - 1>([&](auto j) {
-            auto i = j + 1;
+#pragma unroll
+        for (int i = 1; i < Words; ++i) {
             carry = Gossamer::sub64(mImpl.mWords[i], 0, carry, mImpl.mWords[i]);
-        });
+        }
         return *this;
     }
 
     uint64_t log2() const
     {
         // XXX TODO SIMD implementation
-        for (int64_t i = Words - 1; i >= 0; --i)
+#pragma unroll
+        for (int i = Words - 1; i >= 0; --i)
         {
             if (mImpl.mWords[i])
             {
@@ -530,20 +840,36 @@ public:
 
     bool operator==(const BigInteger& pRhs) const
     {
+#ifdef GOSS_HAVE_SIMD128
+        if constexpr (Words == 2) {
+            using namespace Gossamer::simd;
+            auto x = load_aligned_128(&mImpl.mWords[0]);
+            auto y = load_aligned_128(&pRhs.mImpl.mWords[0]);
+            return test_equal(x, y);
+        }
+#endif
+
         bool equal = mImpl.mWords[0] == pRhs.mImpl.mWords[0];
-        Gossamer::unrolled_loop<int, Words-1>([&](auto i) {
-            equal = mImpl.mWords[i+1] == pRhs.mImpl.mWords[i+1] && equal;
-        });
+#pragma unroll
+        for (int i = 1; i < Words; ++i) {
+            equal = mImpl.mWords[i] == pRhs.mImpl.mWords[i] && equal;
+        }
 
         return equal;
+    }
+
+    bool operator!=(const BigInteger& pRhs) const
+    {
+        return !(*this == pRhs);
     }
 
     bool nonZero() const
     {
         word_type w = mImpl.mWords[0];
-        unrolled_loop<int, Words - 1>([&](auto i) {
-            w |= mImpl.mWords[i + 1];
-        });
+#pragma unroll
+        for (int i = 1; i < Words; ++i) {
+            w |= mImpl.mWords[i];
+        }
         return w != 0;
     }
 
@@ -559,6 +885,7 @@ public:
             return w1lt || (w1eq && w0lt);
         }
         else {
+#pragma unroll
             for (int64_t i = Words - 1; i >= 0; --i)
             {
                 if (mImpl.mWords[i] == pRhs.mImpl.mWords[i]) {
@@ -573,57 +900,44 @@ public:
     static bool equalWithMask(const BigInteger& lhs, const BigInteger& rhs, const BigInteger& mask)
     {
         bool ok = true;
-        Gossamer::unrolled_loop<int, Words>([&](auto i) {
+#pragma unroll
+        for (int i = 0; i < Words; ++i) {
             ok = (lhs.mImpl.mWords[i] & mask.mImpl.mWords[i]) == (rhs.mImpl.mWords[i] & mask.mImpl.mWords[i]) && ok;
-        });
+        }
         return ok;
     }
 
     static bool testAgainstMask(const BigInteger& lhs, const BigInteger& mask)
     {
         bool ok = false;
-        Gossamer::unrolled_loop<int, Words>([&](auto i) {
+#pragma unroll
+        for (int i = 0; i < Words; ++i) {
             ok = (lhs.mImpl.mWords[i] & mask.mImpl.mWords[i]) != 0 || ok;
-        });
+        }
         return ok;
     }
 
     uint64_t hash() const
     {
-        uint64_t hash = Gossamer::sPhi0;
+        uint64_t hash = Gossamer::detail::sPhi7;
 
-        Gossamer::unrolled_loop<int, Words>([&](auto i) {
-            uint64_t w = mImpl.mWords[i];
-            uint64_t whi = w >> 32;
-            uint64_t wlo = w & 0xFFFFFFFF;
-
-            uint64_t hashlo = (Gossamer::sPhi1 * whi + Gossamer::sPhi2 * wlo + Gossamer::sPhi3 * hash) >> 32;
-            uint64_t hashhi = (Gossamer::sPhi4 * whi + Gossamer::sPhi5 * wlo + Gossamer::sPhi6 * hash) >> 32;
-            hash = hashlo | (hashhi << 32);
-        });
+#pragma unroll
+        for (int i = 0; i < Words; ++i) {
+            hash = Gossamer::hash_word(hash, mImpl.mWords[i]);
+        }
         return hash;
     }
 
     static std::pair<uint64_t, uint64_t> hash2(const BigInteger& lhs, const BigInteger& rhs)
     {
-        uint64_t hash0 = Gossamer::sPhi0;
-        uint64_t hash1 = Gossamer::sPhi0;
+        uint64_t hash0 = Gossamer::detail::sPhi7;
+        uint64_t hash1 = Gossamer::detail::sPhi7;
 
-        Gossamer::unrolled_loop<int, Words>([&](auto i) {
-            uint64_t w0 = lhs.mImpl.mWords[i];
-            uint64_t w1 = rhs.mImpl.mWords[i];
-            uint64_t w0hi = w0 >> 32;
-            uint64_t w1hi = w1 >> 32;
-            uint64_t w0lo = w0 & 0xFFFFFFFF;
-            uint64_t w1lo = w1 & 0xFFFFFFFF;
-
-            uint64_t hash0lo = (Gossamer::sPhi1 * w0hi + Gossamer::sPhi2 * w0lo + Gossamer::sPhi3 * hash0) >> 32;
-            uint64_t hash1lo = (Gossamer::sPhi1 * w1hi + Gossamer::sPhi2 * w1lo + Gossamer::sPhi3 * hash1) >> 32;
-            uint64_t hash0hi = (Gossamer::sPhi4 * w0hi + Gossamer::sPhi5 * w0lo + Gossamer::sPhi6 * hash0) >> 32;
-            uint64_t hash1hi = (Gossamer::sPhi4 * w1hi + Gossamer::sPhi5 * w1lo + Gossamer::sPhi6 * hash1) >> 32;
-            hash0 = hash0lo | (hash0hi << 32);
-            hash1 = hash1lo | (hash1hi << 32);
-        });
+#pragma unroll
+        for (int i = 0; i < Words; ++i) {
+            hash0 = Gossamer::hash_word(hash0, lhs.mImpl.mWords[i]);
+            hash1 = Gossamer::hash_word(hash1, rhs.mImpl.mWords[i]);
+        }
         return std::pair<uint64_t, uint64_t>(hash0, hash1);
     }
 
@@ -675,9 +989,11 @@ operator~(BigInteger<Words> pRhs)
         return pRhs;
     }
 #endif
-    Gossamer::unrolled_loop<int, Words>([&](auto i) {
+
+#pragma unroll
+    for (int i = 0; i < Words; ++i) {
         pRhs.words().first[i] = ~pRhs.words().first[i];
-    });
+    }
     return pRhs;
 }
 

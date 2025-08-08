@@ -13,6 +13,7 @@
 #include "JobManager.hh"
 #include "RankSelect.hh"
 #include "VByteCodec.hh"
+#include "Deque.hh"
 
 #include <iostream>
 #include <stdio.h>
@@ -270,7 +271,7 @@ namespace // anonymous
                   FileFactory& pFactory, uint64_t pNumItems, JobManager& pMgr)
     {
         BOOST_ASSERT(pFileNames.size() > 0);
-        deque<ElemPtr> ptrs;
+        Queue<ElemPtr> ptrs;
         for (uint64_t i = 0; i < pFileNames.size(); ++i)
         {
             ptrs.push_back(ElemPtr(new Loader(pFileNames[i], pExpectedEdges[i], pNumItems, pFactory)));

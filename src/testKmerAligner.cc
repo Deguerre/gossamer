@@ -835,7 +835,7 @@ BOOST_AUTO_TEST_CASE(testLinkPairs)
 
         const PairAligner aligner(g, ee, ix);
         
-        std::deque<GossReadSequence::Item> items;
+        Queue<GossReadSequence::Item> items;
 
         GossReadParserFactory fastqParserFac(FastqParser::create);
         GossReadSequenceFactoryPtr seqFac

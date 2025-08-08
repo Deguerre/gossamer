@@ -6,9 +6,9 @@
 // you may not use this file except in compliance with the License.
 // Please see the file LICENSE, included with this distribution.
 //
-#ifndef STD_DEQUE
-#include <deque>
-#define STD_DEQUE
+#ifndef DEQUE_HH
+#include "Deque.hh"
+#define DEQUE_HH
 #endif
 
 
@@ -55,7 +55,7 @@ ExternalVarPushSorter<T,V>::sort(Dest& pDest)
         flush();
     }
 
-    std::deque<FileFactory::TmpFileHolderPtr> q(mFiles.begin(), mFiles.end());
+    Queue<FileFactory::TmpFileHolderPtr> q(mFiles.begin(), mFiles.end());
     mFiles.clear();
     while (q.size() > 2)
     {

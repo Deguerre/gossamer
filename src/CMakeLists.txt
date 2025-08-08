@@ -1,7 +1,4 @@
 
-# XXX FIXME BEFORE DEPLOYING
-add_compile_definitions(GOSS_USE_PDEP)
-
 ADD_LIBRARY(gosslib STATIC
 	GossCmdReg.cc App.cc
 	AnnotTree.cc
@@ -15,6 +12,7 @@ ADD_LIBRARY(gosslib STATIC
 	EntryEdgeSet.cc
 	EstimateGraphStatistics.cc
 	ExternalSortUtils.cc
+	FiberManager.cc
 	FileFactory.cc
 	GossamerException.cc
 	GossFastaReadBaseString.cc
@@ -49,7 +47,7 @@ ADD_LIBRARY(gosslib STATIC
 )
 
 TARGET_LINK_LIBRARIES(gosslib
-    Boost::system Boost::iostreams Boost::filesystem Boost::program_options
+    Boost::system Boost::iostreams Boost::filesystem Boost::program_options Boost::fiber
 	ZLIB::ZLIB
 	${BZIP2_LIBRARIES}
 	libzip::zip

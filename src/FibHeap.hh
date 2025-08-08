@@ -44,9 +44,8 @@
 #define STD_IOSTREAM
 #endif
 
-#ifndef STD_DEQUE
-#include <deque>
-#define STD_DEQUE
+#ifndef DEQUE_HH
+#include "Deque.hh"
 #endif
 
 // Enable TEST_FIB_HEAP to include code which should only be used
@@ -531,7 +530,7 @@ public:
 
     struct Iterator
     {
-        std::deque<const_iterator> mDeque;
+        Deque<const_iterator> mDeque;
 
         bool empty() const
         {

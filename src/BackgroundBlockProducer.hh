@@ -13,12 +13,16 @@
 #include "BoundedQueue.hh"
 #endif
 
+#ifndef DEQUE_HH
+#include "Deque.hh"
+#endif
+
 template <typename Producer>
 class BackgroundBlockProducer
 {
 public:
     typedef typename Producer::value_type value_type;
-    typedef std::deque<value_type> Block; // XXX Deque
+    typedef Deque<value_type> Block;
     typedef std::shared_ptr<Block> BlockPtr;
 
     class ProdWorker
@@ -27,7 +31,7 @@ public:
         void operator()()
         {
             BlockPtr blk(new Block);
-            // blk->reserve(mBlkSz); XXX
+            blk->reserve_back(mBlkSz);
 
             while (mProd.valid())
             {
@@ -36,7 +40,7 @@ public:
                 {
                     mQueue.put(blk);
                     blk = BlockPtr(new Block);
-                    // blk->reserve(mBlkSz); XXX
+                    blk->reserve_back(mBlkSz);
                 }
                 ++mProd;
             }

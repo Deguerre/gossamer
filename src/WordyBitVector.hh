@@ -124,23 +124,23 @@ public:
     class GeneralIterator
     {
     public:
-        bool valid() const
+        GOSS_FORCE_INLINE bool valid() const
         {
             return mValid;
         }
 
-        uint64_t operator*() const
+        GOSS_FORCE_INLINE uint64_t operator*() const
         {
             return mCurrWordNum * wordBits + mCurrBitPos;
         }
 
-        void operator++()
+        GOSS_FORCE_INLINE void operator++()
         {
             next();
             seek1();
         }
 
-        void setPosition(uint64_t pos)
+        GOSS_FORCE_INLINE void setPosition(uint64_t pos)
         {
             uint64_t w = pos / wordBits;
             uint64_t b = pos % wordBits;
@@ -165,7 +165,7 @@ public:
         }
 
     private:
-        void next()
+        GOSS_FORCE_INLINE void next()
         {
             uint64_t bit = mCurrWord & -mCurrWord;  // Extract lowest-order set bit...
             mCurrWord &= ~bit;                      // ..and clear it.
@@ -200,7 +200,7 @@ public:
 
     // Return the number of WORDS in the bitmap
     //
-    uint64_t words() const
+    GOSS_FORCE_INLINE uint64_t words() const
     {
         return mWords.size();
     }
@@ -208,7 +208,7 @@ public:
     
     // Get the value at a given bit position.
     //
-    bool get(uint64_t pBitPos) const
+    GOSS_FORCE_INLINE bool get(uint64_t pBitPos) const
     {
         uint64_t w = pBitPos / wordBits;
         uint64_t b = pBitPos % wordBits;
@@ -222,12 +222,12 @@ public:
     // Return an object for iterating over
     // the positions of the 1s.
     //
-    Iterator1 iterator1() const
+    GOSS_FORCE_INLINE Iterator1 iterator1() const
     {
         return Iterator1(mWords.iterator());
     }
 
-    static LazyIterator1 lazyIterator1(const std::string& pName, FileFactory& pFactory)
+    static GOSS_FORCE_INLINE LazyIterator1 lazyIterator1(const std::string& pName, FileFactory& pFactory)
     {
         return LazyIterator1(MappedArray<uint64_t>::lazyIterator(pName, pFactory));
     }
@@ -235,7 +235,7 @@ public:
     // Find the position of the 'pCount'th 0 bit
     // relative to the 'pFrom'th bit.
     //
-    uint64_t select0(uint64_t pFrom, uint64_t pCount) const
+    GOSS_FORCE_INLINE uint64_t select0(uint64_t pFrom, uint64_t pCount) const
     {
         return select<Inverted>(pFrom, pCount);
     }
@@ -243,7 +243,7 @@ public:
     // Find the position of the 'pCount'th 1 bit
     // relative to the 'pFrom'th bit.
     //
-    uint64_t select1(uint64_t pFrom, uint64_t pCount) const
+    GOSS_FORCE_INLINE uint64_t select1(uint64_t pFrom, uint64_t pCount) const
     {
         return select<Uninverted>(pFrom, pCount);
     }

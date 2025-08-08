@@ -11,6 +11,7 @@
 #include "JobManager.hh"
 #include "RankSelect.hh"
 #include "IntegerCodecs.hh"
+#include "Deque.hh"
 
 #include <iostream>
 #include <stdio.h>
@@ -288,7 +289,7 @@ namespace
                   FileFactory& pFactory, std::uint64_t pBufferSize, JobManager& pMgr)
     {
         BOOST_ASSERT(pParts.size() > 0);
-        std::deque<std::shared_ptr<Elem<Item>>> ptrs;
+        Queue<std::shared_ptr<Elem<Item>>> ptrs;
         for (auto& part : pParts) {
             ptrs.push_back(std::shared_ptr<Elem<Item>>(new Loader<Item>(part, pBufferSize, pFactory)));
             // cerr << "leaf: " << (void*)ptrs.back().get() << '\t' << part.mFname << endl;

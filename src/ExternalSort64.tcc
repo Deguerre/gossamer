@@ -18,13 +18,17 @@
 #define STD_ALGORITHM
 #endif
 
-#ifndef STD_DEQUE
-#include <deque>
-#define STD_DEQUE
+#ifndef STD_VECTOR
+#include <vector>
+#define STD_VECTOR
 #endif
 
 #ifndef GOSSAMEREXCEPTION_HH
 #include "GossamerException.hh"
+#endif
+
+#ifndef DEQUE_HH
+#include "Deque.hh"
 #endif
 
 template <typename T, typename V>
@@ -100,7 +104,7 @@ ExternalSort<T,V>::sort(SrcItr& pSrc, DestItr& pDest, FileFactory& pFactory,
 
     static const uint64_t J = 1024 * 1024;
 
-    deque<FileFactory::TmpFileHolderPtr> q(files.begin(), files.end());
+    Queue<FileFactory::TmpFileHolderPtr> q(files.begin(), files.end());
     files.clear();
     while (q.size() > 4)
     {

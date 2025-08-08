@@ -453,7 +453,7 @@ GossCmdClassifyReads::operator()(const GossCmdContext& pCxt)
         grp.add(*aligners.back());
     }
 
-    deque<GossReadSequence::Item> items;
+    Queue<GossReadSequence::Item> items;
 
     {
         GossReadSequenceFactoryPtr seqFac

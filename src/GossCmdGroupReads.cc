@@ -41,7 +41,7 @@ typedef std::tuple<mutex*, ostream*> Out;
 typedef std::tuple<mutex*, ostream*, ostream*> Outs;
 
 typedef GossReadSequence::Item  ReadItem;
-typedef deque<ReadItem> ReadItems;
+typedef Queue<ReadItem> ReadItems;
 
 namespace // anonymous
 {
@@ -854,7 +854,7 @@ GossCmdGroupReads::operator()(const GossCmdContext& pCxt)
     {
         if (!mLines.empty())
         {
-            std::deque<GossReadSequence::Item> items;
+            Queue<GossReadSequence::Item> items;
 
             GossReadParserFactory lineParserFac(LineParser::create);
             for (auto& f: mLines)
@@ -872,7 +872,7 @@ GossCmdGroupReads::operator()(const GossCmdContext& pCxt)
 
         if (!mFastas.empty())
         {
-            std::deque<GossReadSequence::Item> items;
+            Queue<GossReadSequence::Item> items;
 
             GossReadParserFactory fastaParserFac(FastaParser::create);
             for (auto& f: mFastas)
@@ -890,7 +890,7 @@ GossCmdGroupReads::operator()(const GossCmdContext& pCxt)
 
         if (!mFastqs.empty())
         {
-            std::deque<GossReadSequence::Item> items;
+            Queue<GossReadSequence::Item> items;
 
             GossReadParserFactory fastqParserFac(FastqParser::create);
             for (auto& f: mFastqs)
@@ -910,7 +910,7 @@ GossCmdGroupReads::operator()(const GossCmdContext& pCxt)
     {
         if (!mLines.empty())
         {
-            std::deque<GossReadSequence::Item> items;
+            Queue<GossReadSequence::Item> items;
 
             GossReadParserFactory lineParserFac(LineParser::create);
             for (auto& f: mLines)
@@ -928,7 +928,7 @@ GossCmdGroupReads::operator()(const GossCmdContext& pCxt)
 
         if (!mFastas.empty())
         {
-            std::deque<GossReadSequence::Item> items;
+            Queue<GossReadSequence::Item> items;
 
             GossReadParserFactory fastaParserFac(FastaParser::create);
             for (auto& f: mFastas)
@@ -946,7 +946,7 @@ GossCmdGroupReads::operator()(const GossCmdContext& pCxt)
 
         if (!mFastqs.empty())
         {
-            std::deque<GossReadSequence::Item> items;
+            Queue<GossReadSequence::Item> items;
 
             GossReadParserFactory fastqParserFac(FastqParser::create);
             for (auto& f: mFastqs)

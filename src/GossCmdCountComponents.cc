@@ -186,7 +186,7 @@ GossCmdCountComponents::operator()(const GossCmdContext& pCxt)
     const uint64_t k = g.K();
     const uint64_t z = g.count();
 
-    std::deque<GossReadSequence::Item> items;
+    Queue<GossReadSequence::Item> items;
 
     {
         GossReadSequenceFactoryPtr seqFac

@@ -13,9 +13,8 @@
 #include "GossReadSequence.hh"
 #endif
 
-#ifndef STD_DEQUE
-#include <deque>
-#define STD_DEQUE
+#ifndef DEQUE_HH
+#include "Deque.hh"
 #endif
 
 class ReadSequenceFileSequence : public GossReadSequence
@@ -58,7 +57,7 @@ public:
         next();
     }
 
-    ReadSequenceFileSequence(const std::deque<Item>& pItems,
+    ReadSequenceFileSequence(const Queue<Item>& pItems,
             const FileFactory& pFactory, const LineSourceFactory& pLineSrcFac,
             UnboundedProgressMonitor* pMonPtr=0, Logger* pLoggerPtr=0)
         : GossReadSequence(pMonPtr), mFactory(pFactory), 
@@ -86,7 +85,7 @@ private:
 
     const FileFactory& mFactory;
     LineSourceFactory mLineSrcFac;
-    std::deque<GossReadSequence::Item> mItems;
+    Queue<GossReadSequence::Item> mItems;
     GossReadSequencePtr mReadSequence;
     uint64_t mNumReads;
     Logger* mLoggerPtr;

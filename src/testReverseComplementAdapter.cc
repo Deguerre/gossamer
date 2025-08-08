@@ -37,7 +37,7 @@ BOOST_AUTO_TEST_CASE(test1)
         = std::make_shared<GossReadSequenceBasesFactory>();
     LineSourceFactory lineSrcFac(PlainLineSource::create);
 
-    std::deque<GossReadSequence::Item> items;
+    Queue<GossReadSequence::Item> items;
     items.push_back(GossReadSequence::Item("x.fa", fastaParserFac, seqFac));
     ReadSequenceFileSequence seq(items, fac, lineSrcFac);
 

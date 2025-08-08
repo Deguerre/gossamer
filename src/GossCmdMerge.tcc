@@ -151,7 +151,7 @@ GossCmdMerge<T>::operator()(const GossCmdContext& pCxt)
 
     FileFactory& fac(pCxt.fac);
 
-    deque<Item> todo;
+    Queue<Item> todo;
     for (uint64_t i = 0; i < mIns.size(); ++i)
     {
         todo.push_back(Item(mIns[i], false));

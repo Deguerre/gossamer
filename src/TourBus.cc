@@ -89,7 +89,7 @@ struct TourBus::Impl
         }
     };
 
-    void composeSequence(const deque<Graph::Edge>& pSegStarts, SmallBaseVector& pSeq) const;
+    void composeSequence(const std::deque<Graph::Edge>& pSegStarts, SmallBaseVector& pSeq) const;
 
     void pass();
 
@@ -218,7 +218,7 @@ struct TourBus::Impl
 
     Impl(const Graph& pGraph, Logger& pLog);
 
-    void findStartNodes(deque<StartNodeItem>& pStartNodeQueue);
+    void findStartNodes(std::deque<StartNodeItem>& pStartNodeQueue);
 
     struct FindStartNodeThread;
     typedef std::shared_ptr<FindStartNodeThread> FindStartNodeThreadPtr;
@@ -229,8 +229,8 @@ struct TourBus::Impl
         const Graph& mGraph;
         uint64_t mBegin;
         uint64_t mEnd;
-        deque<Graph::Node> mNodes;
-        deque<StartNodeItem> mStartNodeItems;
+        std::deque<Graph::Node> mNodes;
+        std::deque<StartNodeItem> mStartNodeItems;
 
         typedef pair<Graph::Edge,uint32_t> count_type;
 
@@ -363,7 +363,7 @@ TourBus::Impl::Impl(const Graph& pGraph, Logger& pLog)
 
 
 void
-TourBus::Impl::findStartNodes(deque<StartNodeItem>& pStartNodeQueue)
+TourBus::Impl::findStartNodes(std::deque<StartNodeItem>& pStartNodeQueue)
 {
     using namespace std::placeholders;
 
@@ -406,24 +406,24 @@ TourBus::Impl::findStartNodes(deque<StartNodeItem>& pStartNodeQueue)
 
     mLog(info, "Done.");
 
-    deque<deque<Graph::Node> > nodeRuns;
-    deque<deque<StartNodeItem> > startNodeRuns;
+    Queue<std::deque<Graph::Node> > nodeRuns;
+    Queue<std::deque<StartNodeItem> > startNodeRuns;
     for (uint64_t i = 0; i < blocks.size(); ++i)
     {
         FindStartNodeThread* blk = blocks[i].get();
-        nodeRuns.push_back(deque<Graph::Node>());
-        blk->mNodes.swap(nodeRuns.back());
-        startNodeRuns.push_back(deque<StartNodeItem>());
-        startNodeRuns.back().swap(blk->mStartNodeItems);
+        nodeRuns.emplace_back();
+        std::swap(blk->mNodes, nodeRuns.back());
+        startNodeRuns.emplace_back();
+        std::swap(startNodeRuns.back(), blk->mStartNodeItems);
     }
 
     while (nodeRuns.size() > 2)
     {
-        deque<Graph::Node> a;
-        a.swap(nodeRuns.front());
+        std::deque<Graph::Node> a;
+        std::swap(a, nodeRuns.front());
         nodeRuns.pop_front();
-        deque<Graph::Node> b;
-        b.swap(nodeRuns.front());
+        std::deque<Graph::Node> b;
+        std::swap(b, nodeRuns.front());
         nodeRuns.pop_front();
 
         // cast to a specific overload function of push_back
@@ -431,15 +431,17 @@ TourBus::Impl::findStartNodes(deque<StartNodeItem>& pStartNodeQueue)
         //   deque<T>::push_back(const T&)
         //   deque<T>::push_back(T&&) // C++11 move semantic
         // being unresolvable.
-        void (deque<Graph::Node>:: *dequePushBaskConstRef)(const Graph::Node&) = &deque<Graph::Node>::push_back;
+        //
+        // XXX TODO This just should be a lambda.
+        void (std::deque<Graph::Node>:: *dequePushBaskConstRef)(const Graph::Node&) = &std::deque<Graph::Node>::push_back;
 
-        deque<Graph::Node> c;
+        std::deque<Graph::Node> c;
         merge(a.begin(), a.end(), b.begin(), b.end(),
               make_function_output_iterator(
                   std::bind(dequePushBaskConstRef, std::ref(c), _1)));
 
-        nodeRuns.push_back(deque<Graph::Node>());
-        nodeRuns.back().swap(c);
+        nodeRuns.emplace_back();
+        std::swap(nodeRuns.back(), c);
     }
 
     mNodes.clear();
@@ -453,8 +455,8 @@ TourBus::Impl::findStartNodes(deque<StartNodeItem>& pStartNodeQueue)
 
         case 1:
         {
-            deque<Graph::Node> a;
-            a.swap(nodeRuns.front());
+            std::deque<Graph::Node> a;
+            std::swap(a, nodeRuns.front());
             nodeRuns.pop_front();
             mNodes.reserve(a.size());
             mNodes.insert(mNodes.end(), a.begin(), a.end());
@@ -463,12 +465,12 @@ TourBus::Impl::findStartNodes(deque<StartNodeItem>& pStartNodeQueue)
 
         case 2:
         {
-            deque<Graph::Node> a;
-            a.swap(nodeRuns.front());
+            std::deque<Graph::Node> a;
+            std::swap(a, nodeRuns.front());
             nodeRuns.pop_front();
 
-            deque<Graph::Node> b;
-            b.swap(nodeRuns.front());
+            std::deque<Graph::Node> b;
+            std::swap(b, nodeRuns.front());
             nodeRuns.pop_front();
 
             // cast to a specific overload function of push_back
@@ -476,6 +478,9 @@ TourBus::Impl::findStartNodes(deque<StartNodeItem>& pStartNodeQueue)
             //   vector<T>::push_back(const T&)
             //   vector<T>::push_back(T&&) // C++11 move semantic
             // being unresolvable.
+            //
+            // XXX TODO This just should be a lambda.
+
             void (vector<Graph::Node>:: *vectorPushBaskConstRef)(const Graph::Node&) = &vector<Graph::Node>::push_back;
 
             mNodes.reserve(a.size() + b.size());
@@ -498,11 +503,11 @@ TourBus::Impl::findStartNodes(deque<StartNodeItem>& pStartNodeQueue)
 
     while (startNodeRuns.size() > 1)
     {
-        deque<StartNodeItem> a;
-        a.swap(startNodeRuns.front());
+        std::deque<StartNodeItem> a;
+        std::swap(a, startNodeRuns.front());
         startNodeRuns.pop_front();
-        deque<StartNodeItem> b;
-        b.swap(startNodeRuns.front());
+        std::deque<StartNodeItem> b;
+        std::swap(b, startNodeRuns.front());
         startNodeRuns.pop_front();
 
         // cast to a specific overload function of push_back
@@ -510,15 +515,17 @@ TourBus::Impl::findStartNodes(deque<StartNodeItem>& pStartNodeQueue)
         //   vector<T>::push_back(const T&)
         //   vector<T>::push_back(T&&) // C++11 move semantic
         // being unresolvable.
-        void (deque<StartNodeItem>:: *dequePushBaskConstRef)(const StartNodeItem&) = &deque<StartNodeItem>::push_back;
+        //
+        // XXX TODO Make it a lambda
+        void (std::deque<StartNodeItem>:: *dequePushBaskConstRef)(const StartNodeItem&) = &std::deque<StartNodeItem>::push_back;
 
-        deque<StartNodeItem> c;
+        std::deque<StartNodeItem> c;
         merge(a.begin(), a.end(), b.begin(), b.end(),
               make_function_output_iterator(
                   std::bind(dequePushBaskConstRef, std::ref(c), _1)));
 
-        startNodeRuns.push_back(deque<StartNodeItem>());
-        startNodeRuns.back().swap(c);
+        startNodeRuns.emplace_back();
+        std::swap(startNodeRuns.back(), c);
     }
 
     pStartNodeQueue.clear();
@@ -531,7 +538,7 @@ TourBus::Impl::findStartNodes(deque<StartNodeItem>& pStartNodeQueue)
 
         case 1:
         {
-            pStartNodeQueue.swap(startNodeRuns.front());
+            std::swap(pStartNodeQueue, startNodeRuns.front());
             startNodeRuns.pop_front();
             break;
         }
@@ -565,7 +572,7 @@ TourBus::Impl::doWholeGraph()
         mLog(info, "   relative cutoff = " + lexical_cast<string>(mRelCutoff));
     }
 
-    deque<StartNodeItem> startNodeQueue;
+    std::deque<StartNodeItem> startNodeQueue;
     findStartNodes(startNodeQueue);
 
     uint64_t j = 0;
@@ -645,7 +652,7 @@ TourBus::Impl::doWholeGraph()
 void
 TourBus::Impl::doSingleNode(const Graph::Node& pBegin)
 {
-    deque<StartNodeItem> startNodeQueue;
+    std::deque<StartNodeItem> startNodeQueue;
     findStartNodes(startNodeQueue);
     startNodeQueue.clear();
 
@@ -926,7 +933,7 @@ TourBus::Impl::analyseEdge(const Graph::Edge& pEnd, const Graph::Edge& pBegin)
     // Let's compose the edge lists.
 
     SmallBaseVector minSeq;
-    deque<Graph::Edge> min;
+    std::deque<Graph::Edge> min;
     Graph::Edge e = pBegin;
 #ifdef VERBOSE_DEBUG
     sbv.clear();
@@ -959,7 +966,7 @@ TourBus::Impl::analyseEdge(const Graph::Edge& pEnd, const Graph::Edge& pBegin)
     }
 
     SmallBaseVector maxSeq;
-    deque<Graph::Edge> max;
+    std::deque<Graph::Edge> max;
     {
         Graph::Edge e = majEdge;
 #ifdef VERBOSE_DEBUG
@@ -1079,7 +1086,7 @@ TourBus::Impl::analyseEdge(const Graph::Edge& pEnd, const Graph::Edge& pBegin)
 
 
 void
-TourBus::Impl::composeSequence(const deque<Graph::Edge>& pSegStarts,
+TourBus::Impl::composeSequence(const std::deque<Graph::Edge>& pSegStarts,
                                SmallBaseVector& pSeq) const
 {
     pSeq.clear();

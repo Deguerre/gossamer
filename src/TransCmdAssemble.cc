@@ -18,7 +18,6 @@
 #include <string>
 #include <cmath>
 #include <algorithm>
-#include <deque>
 #include <map>
 #include <memory>
 #include <boost/lexical_cast.hpp>
@@ -40,6 +39,7 @@
 #include "ExternalBufferSort.hh"
 #include "BoundedQueue.hh"
 #include "VByteCodec.hh"
+#include "Deque.h"
 
 #undef DEBUG
 #undef DUMP_CONTIGS
@@ -373,7 +373,7 @@ namespace // anonymous
         uint64_t mEnd;
         const uint64_t mMinSeedCoverage;
         const double mMinSeedEntropy;
-        deque<SeedInfo> mSeedEdges;
+        Queue<SeedInfo> mSeedEdges;
 
         typedef pair<Graph::Edge,uint32_t> count_type;
 
@@ -523,7 +523,7 @@ public:
 
         mWhichComponent.clear();
 
-        deque<uint8_t> v;
+        Queue<uint8_t> v;
         VByteCodec::encode(component, v);
         lhs.encode(v);
         rhs.encode(v);
@@ -655,20 +655,20 @@ struct TransCmdAssemble : public GossCmd
     GraphPtr mGPtr;
     dynamic_bitset<> mSeen;
 
-    void findSeedEdges(Logger& pLog, deque<SeedInfo>& pSeedEdges);
+    void findSeedEdges(Logger& pLog, Queue<SeedInfo>& pSeedEdges);
 
     bool step(Logger& pLog, const EdgeInfo& pFrom, bool pFwd, EdgeInfo& pNextEdge) const;
 
-    void scan(Logger& pLog, deque<EdgeInfo>& pEdges, const EdgeInfo& pEdge, bool pFwd);
+    void scan(Logger& pLog, Queue<EdgeInfo>& pEdges, const EdgeInfo& pEdge, bool pFwd);
 
     void operator()(const GossCmdContext& pCxt);
 
-    void initialiseReads(std::deque<GossReadSequence::Item>& pItems);
+    void initialiseReads(Queue<GossReadSequence::Item>& pItems);
 };
 
 
 void
-TransCmdAssemble::initialiseReads(std::deque<GossReadSequence::Item>& pItems)
+TransCmdAssemble::initialiseReads(Queue<GossReadSequence::Item>& pItems)
 {
     GossReadSequenceFactoryPtr seqFac
         = std::make_shared<GossReadSequenceBasesFactory>();
@@ -694,7 +694,7 @@ TransCmdAssemble::initialiseReads(std::deque<GossReadSequence::Item>& pItems)
 
 
 void
-TransCmdAssemble::findSeedEdges(Logger& pLog, deque<SeedInfo>& pSeedEdges)
+TransCmdAssemble::findSeedEdges(Logger& pLog, Queue<SeedInfo>& pSeedEdges)
 {
     Graph& g(*mGPtr);
 
@@ -735,29 +735,29 @@ TransCmdAssemble::findSeedEdges(Logger& pLog, deque<SeedInfo>& pSeedEdges)
 
     pLog(info, "Done.");
 
-    deque<deque<SeedInfo> > seedEdgeRuns;
+    Queue<Queue<SeedInfo> > seedEdgeRuns;
     for (uint64_t i = 0; i < blocks.size(); ++i)
     {
         FindSeedEdgeThread* blk = blocks[i].get();
-        seedEdgeRuns.push_back(deque<SeedInfo>());
+        seedEdgeRuns.push_back(Queue<SeedInfo>());
         blk->mSeedEdges.swap(seedEdgeRuns.back());
     }
 
     while (seedEdgeRuns.size() > 1)
     {
-        deque<SeedInfo> a;
+        Queue<SeedInfo> a;
         a.swap(seedEdgeRuns.front());
         seedEdgeRuns.pop_front();
-        deque<SeedInfo> b;
+        Queue<SeedInfo> b;
         b.swap(seedEdgeRuns.front());
         seedEdgeRuns.pop_front();
 
-        deque<SeedInfo> c;
+        Queue<SeedInfo> c;
         merge(a.begin(), a.end(), b.begin(), b.end(),
-              back_insert_iterator< deque<SeedInfo> >(c),
+              back_insert_iterator< Queue<SeedInfo> >(c),
               seedInfoGt);
 
-        seedEdgeRuns.push_back(deque<SeedInfo>());
+        seedEdgeRuns.push_back(Queue<SeedInfo>());
         seedEdgeRuns.back().swap(c);
     }
 
@@ -909,7 +909,7 @@ TransCmdAssemble::step(Logger& pLog, const EdgeInfo& pFrom, bool pFwd, EdgeInfo&
 
 
 void
-TransCmdAssemble::scan(Logger& pLog, deque<EdgeInfo>& pEdges,
+TransCmdAssemble::scan(Logger& pLog, Queue<EdgeInfo>& pEdges,
                        const EdgeInfo& pEdge, bool pFwd)
 
 {
@@ -962,7 +962,7 @@ struct ContigWeldGraph
         mutex mMutex;
         uint32_t mOrder;
         vector<AdjListEntry> mMain;
-        deque<AdjListEntry> mOverflow;
+        Queue<AdjListEntry> mOverflow;
         
         void copyOverflowToMain(bool pMinimiseStorage = false)
         {
@@ -1024,7 +1024,7 @@ struct ContigWeldGraph
         }
     };
 
-    deque<ContigInfo> mContigInfo;
+    Queue<ContigInfo> mContigInfo;
     ptr_vector<AdjList> mGraph;
     vector< vector<uint32_t> > mComponents;
 
@@ -1072,7 +1072,7 @@ struct ContigWeldGraph
             const uint32_t sMinEdgeCoverage = 1;
             const double sCoverageFactor = 0.04;
 
-            deque<AdjListEntry> keepEdges;
+            Queue<AdjListEntry> keepEdges;
 
             for (auto& edge: adjlist.mMain)
             {
@@ -1407,7 +1407,7 @@ TransCmdAssemble::operator()(const GossCmdContext& pCxt)
     mSeen.clear();
     mSeen.resize(g.count());
 
-    deque<SeedInfo> seedEdges;
+    Queue<SeedInfo> seedEdges;
     log(info, "  Number of edges: " + lexical_cast<string>(g.count()));
 
     findSeedEdges(log, seedEdges);
@@ -1425,7 +1425,7 @@ TransCmdAssemble::operator()(const GossCmdContext& pCxt)
 
         linkGraph.addContig(ContigInfo(ContigInfo::Sentinel()));
 
-        deque<EdgeInfo> edges;
+        Queue<EdgeInfo> edges;
         uint64_t contig = 1;
         uint64_t edgesInContigs = 0;
         const int64_t workQuantum = 100000ull;
@@ -1538,7 +1538,7 @@ TransCmdAssemble::operator()(const GossCmdContext& pCxt)
     {
         log(info, "Pass 3 - linking contigs");
 
-        std::deque<GossReadSequence::Item> items;
+        Queue<GossReadSequence::Item> items;
         initialiseReads(items);
 
         UnboundedProgressMonitor umon(log, 100000, " pairs");
@@ -1618,7 +1618,7 @@ TransCmdAssemble::operator()(const GossCmdContext& pCxt)
     {
         log(info, "Pass 4 - mapping reads to contigs");
 
-        std::deque<GossReadSequence::Item> items;
+        Queue<GossReadSequence::Item> items;
         initialiseReads(items);
 
         UnboundedProgressMonitor umon(log, 100000, " pairs");

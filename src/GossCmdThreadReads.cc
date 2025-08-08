@@ -713,7 +713,7 @@ GossCmdThreadReads::operator()(const GossCmdContext& pCxt)
         auto idxPtr = EdgeIndex::create(g, entries, sg, mCacheRate, mNumThreads, log);
         EdgeIndex& idx(*idxPtr);
 
-        std::deque<GossReadSequence::Item> items;
+        Queue<GossReadSequence::Item> items;
 
         {
             GossReadSequenceFactoryPtr seqFac

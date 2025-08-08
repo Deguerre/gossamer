@@ -277,7 +277,7 @@ GossCmdBuildGraph::operator()(const GossCmdContext& pCxt)
 
     const uint64_t rho = mK + 1;
 
-    std::deque<GossReadSequence::Item> items;
+    Queue<GossReadSequence::Item> items;
 
     {
         GossReadSequenceFactoryPtr seqFac

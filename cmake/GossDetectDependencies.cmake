@@ -3,7 +3,11 @@
 set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 
-find_package(Boost 1.79.0 COMPONENTS system iostreams program_options filesystem timer REQUIRED)
+if (POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
+
+find_package(Boost 1.71.0 COMPONENTS system iostreams program_options filesystem timer fiber REQUIRED)
 if (Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
 endif (Boost_FOUND)

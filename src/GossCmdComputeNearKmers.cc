@@ -77,7 +77,7 @@ GossCmdComputeNearKmers::operator()(const GossCmdContext& pCxt)
             std::promise<void> mComplete;
         };
 
-        deque<BlockWorkerJob> jobs;
+        Queue<BlockWorkerJob> jobs;
         const uint64_t d = Gossamer::align_up((uint64_t(1) << 21) * mNumThreads, 10);
         ProgressMonitorFixed pm(log, s.count(), d);
 #ifdef SYNCHRONISE_BIT_VECTORS

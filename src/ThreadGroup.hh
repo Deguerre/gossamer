@@ -19,9 +19,8 @@
 #define STD_MUTEX
 #endif
 
-#ifndef STD_DEQUE
-#include <deque>
-#define STD_DEQUE
+#ifndef DEQUE_HH
+#include "Deque.hh"
 #endif
 
 #ifndef BOOST_NONCOPYABLE_HPP
@@ -65,7 +64,7 @@ public:
     }
 
 private:
-    std::deque<std::thread*> mThreads;
+    Queue<std::thread*> mThreads;
     mutable std::mutex mMut;
 };
 

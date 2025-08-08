@@ -1,13 +1,14 @@
+cmake_minimum_required(VERSION 3.30)
+
 project(gossamer)
 
-cmake_minimum_required(VERSION 3.12)
-set(PACKAGE_BUGREPORT "need-an-email-address")
+set(PACKAGE_BUGREPORT "Deguerre@github.com")
 set(PACKAGE_NAME "gossamer")
-set(PACKAGE_VERSION "1.0.0a")
+set(PACKAGE_VERSION "2.0.0-development")
 set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
 set(PACKAGE_TARNAME "${PACKAGE_NAME}")
 
-option(BUILD_docs "build the documents" ON)
+option(BUILD_docs "build the documents" OFF)
 option(BUILD_tests "build the tests" ON)
 option(BUILD_translucent "build translucent" OFF)
 set(CMAKE_CXX_STANDARD 17)  

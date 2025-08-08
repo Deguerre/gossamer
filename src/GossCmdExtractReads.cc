@@ -59,7 +59,7 @@ GossCmdExtractReads::operator()(const GossCmdContext& pCxt)
     FileFactory::OutHolderPtr outPtr(fac.out(mOut));
     ostream& out(**outPtr);
 
-    std::deque<GossReadSequence::Item> items;
+    Queue<GossReadSequence::Item> items;
 
     {
         GossReadSequenceFactoryPtr seqFac

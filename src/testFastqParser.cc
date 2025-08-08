@@ -27,7 +27,7 @@ getFastqReader(StringFileFactory& fac, const char* filename)
         = std::make_shared<GossReadSequenceBasesFactory>();
     LineSourceFactory lineSrcFac(PlainLineSource::create);
 
-    std::deque<GossReadSequence::Item> items;
+    Queue<GossReadSequence::Item> items;
     items.push_back(GossReadSequence::Item(filename, fastqParserFac, seqFac));
     return std::make_shared<ReadSequenceFileSequence>(items, fac, lineSrcFac);
 }

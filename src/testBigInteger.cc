@@ -14,6 +14,7 @@
 
 #include "BigInteger.hh"
 #include "RankSelect.hh"
+#include <random>
 
 using namespace boost;
 using namespace std;
@@ -168,6 +169,8 @@ BOOST_AUTO_TEST_CASE(test_subtract)
 
 BOOST_AUTO_TEST_CASE(test_shift_128)
 {
+    using namespace Gossamer::detail;
+
     BigInteger<2> a(1);
     a <<= 126;
     BOOST_CHECK_EQUAL(lexical_cast<string>(a), "85070591730234615865843651857942052864");
@@ -197,11 +200,11 @@ BOOST_AUTO_TEST_CASE(test_shift_128)
     a >>= 127;
     BOOST_CHECK_EQUAL(lexical_cast<string>(a), "1");
 
-    BigInteger<2> b(Gossamer::sPhi0);
+    BigInteger<2> b(sPhi0);
     b <<= 64;
-    b |= BigInteger<2>(Gossamer::sPhi1);
-    BOOST_CHECK_EQUAL(b.mostSigWord(), Gossamer::sPhi0);
-    BOOST_CHECK_EQUAL(b.asUInt64(), Gossamer::sPhi1);
+    b |= BigInteger<2>(sPhi1);
+    BOOST_CHECK_EQUAL(b.mostSigWord(), sPhi0);
+    BOOST_CHECK_EQUAL(b.asUInt64(), sPhi1);
     {
         BigInteger<2> x = b;
         x <<= 0;
@@ -212,26 +215,26 @@ BOOST_AUTO_TEST_CASE(test_shift_128)
     for (unsigned i = 1; i < 64; ++i) {
         BigInteger<2> x = b;
         x <<= i;
-        BOOST_CHECK_EQUAL(x.mostSigWord(), (Gossamer::sPhi0 << i) | (Gossamer::sPhi1 >> (64 - i)));
-        BOOST_CHECK_EQUAL(x.asUInt64(), Gossamer::sPhi1 << i);
+        BOOST_CHECK_EQUAL(x.mostSigWord(), (sPhi0 << i) | (sPhi1 >> (64 - i)));
+        BOOST_CHECK_EQUAL(x.asUInt64(), sPhi1 << i);
     }
     for (unsigned i = 64; i < 128; ++i) {
         BigInteger<2> x = b;
         x <<= i;
-        BOOST_CHECK_EQUAL(x.mostSigWord(), Gossamer::sPhi1 << (i - 64));
+        BOOST_CHECK_EQUAL(x.mostSigWord(), sPhi1 << (i - 64));
         BOOST_CHECK_EQUAL(x.asUInt64(), 0);
     }
     for (unsigned i = 1; i < 64; ++i) {
         BigInteger<2> x = b;
         x >>= i;
-        BOOST_CHECK_EQUAL(x.mostSigWord(), Gossamer::sPhi0 >> i);
-        BOOST_CHECK_EQUAL(x.asUInt64(), (Gossamer::sPhi0 << (64 - i)) | (Gossamer::sPhi1 >> i));
+        BOOST_CHECK_EQUAL(x.mostSigWord(), sPhi0 >> i);
+        BOOST_CHECK_EQUAL(x.asUInt64(), (sPhi0 << (64 - i)) | (sPhi1 >> i));
     }
     for (unsigned i = 64; i < 128; ++i) {
         BigInteger<2> x = b;
         x >>= i;
         BOOST_CHECK_EQUAL(x.mostSigWord(), 0);
-        BOOST_CHECK_EQUAL(x.asUInt64(), Gossamer::sPhi0 >> (i - 64));
+        BOOST_CHECK_EQUAL(x.asUInt64(), sPhi0 >> (i - 64));
     }
 }
 
@@ -386,6 +389,162 @@ BOOST_AUTO_TEST_CASE(test_hash)
     BOOST_CHECK_EQUAL(ha1, ha2);
     BOOST_CHECK_EQUAL(hb1, hb2);
 }
+
+
+// Slow version of Wittler canoncal test.
+template<int Words>
+bool bigIntegerIsWittlerCanonical(const BigInteger<Words>& x, uint64_t pK)
+{
+    BigInteger<Words> y(x);
+    y.reverseComplement(pK);
+    uint64_t i = 0;
+    auto xw = x.words();
+    auto yw = y.words();
+    for (; i <= pK / 2; ++i) {
+        auto bit = (pK - i - 1) * 2;
+        auto w = bit / BigInteger<Words>::sBitsPerWord;
+        auto b = bit % BigInteger<Words>::sBitsPerWord;
+        auto l = (xw.first[w] >> b) & 3;
+        auto r = (yw.first[w] >> b) & 3;
+        if (l < r) {
+            return true;
+        }
+        else if (l > r) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+// Slow version of Wittler canonicalise.
+template<int Words>
+BigInteger<Words> bigIntegerWittlerCanonicalise(const BigInteger<Words>& x, uint64_t pK)
+{
+    BigInteger<Words> y(x);
+    y.reverseComplement(pK);
+
+    uint64_t i = 0;
+    auto xw = x.words();
+    auto yw = y.words();
+    for (; i <= pK / 2; ++i) {
+        auto bit = (pK - i - 1) * 2;
+        auto w = bit / BigInteger<Words>::sBitsPerWord;
+        auto b = bit % BigInteger<Words>::sBitsPerWord;
+        auto l = (xw.first[w] >> b) & 3;
+        auto r = (yw.first[w] >> b) & 3;
+        if (l < r) {
+            return x;
+        }
+        else if (l > r) {
+            return y;
+        }
+    }
+}
+
+
+BOOST_AUTO_TEST_CASE(test_wittler_canon)
+{
+    unsigned testKs[] = { 11, 19, 31, 33, 63 };
+    const unsigned TEST_VALUES = 2;
+    std::mt19937 gen(2024111801);
+    std::uniform_int_distribution<> distrib(0, 3);
+
+    for (auto k : testKs) {
+        for (unsigned test = 0; test < TEST_VALUES; ++test) {
+            BigInteger<2> x;
+            for (unsigned i = 0; i < k; ++i) {
+                BigInteger<2> nt(distrib(gen));
+                nt <<= (2 * i);
+                x |= nt;
+            }
+
+            BOOST_CHECK_EQUAL(x.wittlerCanonical(k), bigIntegerIsWittlerCanonical(x, k));
+            auto y1 = x;
+            y1.wittlerCanonicalise(k);
+            auto y2 = bigIntegerWittlerCanonicalise(x, k);
+            BOOST_CHECK_EQUAL(y1, y2);
+        }
+    }
+}
+
+
+#if 0
+
+
+BOOST_AUTO_TEST_CASE(test_whittler_3mers)
+{
+    static unsigned K = 3;
+
+    uint16_t sCodes3[] = {
+        16, 12, 8, 4, 17, 13, 9, 0,
+        18, 14, 10, 19, 15, 11, 24, 20,
+        5, 25, 21, 1, 26, 22, 27, 23,
+        28, 6, 29, 2, 30, 31, 7, 3
+    };
+
+    unsigned i = 0;
+    for (uint64_t v = 0; v < (1ull << (2 * K)); ++v) {
+        BigInteger<1> kmer(v);
+
+        if (!kmer.wittlerCanonical(K)) {
+            continue;
+        }
+
+        auto code = kmer.wittlerEncode(K);
+        BOOST_CHECK_EQUAL(code.asUInt64(), sCodes3[i]);
+
+        auto kmer2 = code.wittlerDecode(K);
+        BOOST_CHECK_EQUAL(kmer.asUInt64(), kmer2.asUInt64());
+
+        ++i;
+    }
+}
+
+
+BOOST_AUTO_TEST_CASE(test_whittler_4mers)
+{
+    static unsigned K = 4;
+
+	uint16_t sCodes4[] = {
+	72, 56, 40, 24, 73, 57, 41, 20,
+	74, 58, 42, 16, 75, 59, 43, 0,
+	76, 60, 44, 32, 77, 61, 45, 28,
+	78, 62, 46, 4, 79, 63, 47, 80,
+	64, 48, 36, 81, 65, 49, 8, 82,
+	66, 50, 83, 67, 51, 84, 68, 52,
+	12, 85, 69, 53, 86, 70, 54, 87,
+	71, 55, 104, 88, 25, 105, 89, 21,
+	106, 90, 17, 107, 91, 1, 108, 92,
+	33, 109, 93, 29, 110, 94, 5, 111,
+	95, 112, 96, 37, 113, 97, 9, 114,
+	98, 115, 99, 116, 100, 13, 117, 101,
+	118, 102, 119, 103, 120, 26, 121, 22,
+	122, 18, 123, 2, 124, 34, 125, 30,
+	126, 6, 127, 128, 38, 129, 10, 130,
+	131, 132, 14, 133, 134, 135, 27, 23,
+	19, 3, 35, 31, 7, 39, 11, 15
+	};
+
+    unsigned i = 0;
+    for (uint64_t v = 1; v < (1ull << (2*K)); ++v) {
+        BigInteger<1> kmer(v);
+
+        if (!kmer.wittlerCanonical(K)) {
+            continue;
+        }
+
+        std::cerr << "Testing kmer " << kmer.asUInt64() << '\n';
+        auto code = kmer.wittlerEncode(K);
+        // BOOST_CHECK_EQUAL(code.asUInt64(), sCodes4[i]);
+
+        auto kmer2 = code.wittlerDecode(K);
+        BOOST_CHECK_EQUAL(kmer.asUInt64(), kmer2.asUInt64());
+
+        ++i;
+    }
+}
+#endif
 
 
 #include "testEnd.hh"

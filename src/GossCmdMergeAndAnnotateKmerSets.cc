@@ -97,7 +97,7 @@ GossCmdMergeAndAnnotateKmerSets::operator()(const GossCmdContext& pCxt)
 			}
 		};
 
-		std::deque<WorkItem> items;
+        Queue<WorkItem> items;
 		uint64_t size, chunksize;
 		if (lhs.count() > rhs.count()) {
 			size = lhs.count();
@@ -185,7 +185,7 @@ GossCmdMergeAndAnnotateKmerSets::operator()(const GossCmdContext& pCxt)
 			{
 			}
 		};
-		std::deque<WorkItem> items;
+        Queue<WorkItem> items;
 		uint64_t size;
 		if (lhs.count() < rhs.count()) {
 			size = lhs.count();

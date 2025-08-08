@@ -47,6 +47,10 @@
 #include "Profile.hh"
 #endif
 
+#ifndef DEQUE_HH
+#include "Deque.hh"
+#endif
+
 template <typename T, bool W = false>
 class BoundedQueue
 {
@@ -152,7 +156,7 @@ public:
 
 private:
     const uint64_t mMaxItems;
-    std::deque<T> mItems; // XXX Fix to Deque
+    Queue<T> mItems;
     bool mFinished;
     std::mutex mMutex;
     std::condition_variable mFullCond;

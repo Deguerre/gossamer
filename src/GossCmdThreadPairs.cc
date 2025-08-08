@@ -818,7 +818,7 @@ GossCmdThreadPairs::operator()(const GossCmdContext& pCxt)
         EdgeIndex& idx(*idxPtr);
         const PairAligner alnr(g, entries, idx);
 
-        std::deque<GossReadSequence::Item> items;
+        Queue<GossReadSequence::Item> items;
 
         {
             GossReadSequenceFactoryPtr seqFac

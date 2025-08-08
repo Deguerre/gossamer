@@ -64,6 +64,11 @@
 #define SIGNAL_H
 #endif
 
+#ifndef STD_LIMITS
+#include <limits>
+#define STD_LIMITS
+#endif
+
 #ifndef STD_OPTIONAL
 #include <optional>
 #define STD_OPTIONAL
@@ -80,6 +85,19 @@
 #include "MachDepPlatform.hh"
 #endif
 
+
+#if defined(GOSS_COMPILER_MSVC)
+#define GOSS_FORCE_INLINE inline __forceinline
+#elif defined(GOSS_COMPILER_CLANG)
+#define GOSS_FORCE_INLINE inline __attribute__((flatten))
+#elif defined(GOSS_COMPILER_GCC)
+#define GOSS_FORCE_INLINE inline __attribute__((flatten))
+#else
+#define GOSS_FORCE_INLINE inline
+#endif
+
+
+ 
 class MachineAutoSetup
 {
 public:
@@ -106,14 +124,14 @@ namespace Gossamer
     static constexpr unsigned sPageAlignBits = 16;
 
     // Align up
-    inline constexpr uint64_t align_up(uint64_t x, unsigned bits)
+    GOSS_FORCE_INLINE constexpr uint64_t align_up(uint64_t x, unsigned bits)
     {
         const uint64_t mask = (uint64_t(1) << bits) - 1;
         return (x + mask) & ~mask;
     }
 
     // Align down
-    inline constexpr uint64_t align_down(uint64_t x, unsigned bits)
+    GOSS_FORCE_INLINE constexpr uint64_t align_down(uint64_t x, unsigned bits)
     {
         const uint64_t mask = (uint64_t(1) << bits) - 1;
         return x & ~mask;
@@ -124,7 +142,7 @@ namespace Gossamer
 uint32_t logicalProcessorCount();
 
 
-inline uint32_t popcnt(uint64_t pWord)
+GOSS_FORCE_INLINE uint32_t popcnt(uint64_t pWord)
 {
     BOOST_STATIC_ASSERT(sizeof(long) == 8 || sizeof(unsigned long long) == 8);
 
@@ -144,6 +162,14 @@ inline uint32_t popcnt(uint64_t pWord)
 #endif
 }
 
+
+inline uint64_t count_leading_zeroes_by_float(uint64_t pWord)
+{
+    float fWord = (float)(pWord & ~(pWord >> 1)) + 0.5f;
+    return pWord ? 64 - std::ilogbf(fWord) : 64;
+}
+
+
 inline uint64_t count_leading_zeroes(uint64_t pWord)
 {
     BOOST_STATIC_ASSERT(sizeof(long) == 8 || sizeof(unsigned long long) == 8);
@@ -161,32 +187,13 @@ inline uint64_t count_leading_zeroes(uint64_t pWord)
         return pWord ? __builtin_clzll(pWord) : 64;
     }
 #elif defined(GOSS_WINDOWS_X64)
-    // Note that the GNUC intrinsic function will return undefined
-    // values if the input is zero. So lets be sane here and return
-    // 64 which should mean all zeros.
-    if( pWord == 0 )
-    {
-        return 64;
-    }
-    else
-    {
-        unsigned long idx;
-        // If a set bit is found, the bit position (zero based) of the first
-        // set bit found is returned in the first parameter.
-        // If no set bit is found, 0 is returned; otherwise, 1 is returned.
-        _BitScanReverse64(&idx, pWord);
-        // Should return the number of leading zeros.
-        return (63-idx);
-    }
+    unsigned long idx;
+    // If a set bit is found, the bit position (zero based) of the first
+    // set bit found is returned in the first parameter.
+    // If no set bit is found, 0 is returned; otherwise, 1 is returned.
+    return _BitScanReverse64(&idx, pWord) ? (63-idx) : 64;
 #else
-    pWord |= pWord >> 1;
-    pWord |= pWord >> 2;
-    pWord |= pWord >> 4;
-    pWord |= pWord >> 8;
-    pWord |= pWord >> 16;
-    pWord |= pWord >> 32;
-
-    return popcnt(~pWord);
+    return count_leading_zeroes_by_float(pWord);
 #endif
 }
 
@@ -338,38 +345,25 @@ inline uint64_t select_by_mask(uint64_t pWord, int pR)
 }
 
 
-#ifdef GOSS_USE_PDEP
-inline uint64_t select_by_pdep(uint64_t pWord, uint64_t pR)
-{
-    uint64_t bit = _pdep_u64(uint64_t(1) << pR, pWord);
-    return find_first_set(bit) - 1;
-}
-#endif
-
-
 inline uint64_t select1(uint64_t pWord, uint64_t pRank)
 {
-#ifdef GOSS_USE_PDEP
-    return select_by_pdep(pWord, pRank);
+#ifdef GOSS_HAVE_PLATFORM_SELECT
+    return platform_select(pWord, pRank);
 #else
     return select_by_vigna(pWord, pRank);
 #endif
 }
 
 
-inline uint64_t log2(uint64_t pX)
+inline uint64_t ceilLog2(uint64_t pX)
 {
-#if defined(GOSS_WINDOWS_X64) || defined(GOSS_LINUX_X64) || defined(GOSS_MACOSX_X64)
     return pX == 1 ? 0 : (64 - count_leading_zeroes(pX - 1));
-#else
-    pWord |= pWord >> 1;
-    pWord |= pWord >> 2;
-    pWord |= pWord >> 4;
-    pWord |= pWord >> 8;
-    pWord |= pWord >> 16;
-    pWord |= pWord >> 32;
-    return popcnt(pWord) - 1;
-#endif
+}
+
+
+inline uint64_t floorLog2(uint64_t pX)
+{
+    return pX == 1 ? 0 : (63 - count_leading_zeroes(pX));
 }
 
 
@@ -379,8 +373,7 @@ constexpr inline uint64_t roundUpToNextPowerOf2(uint64_t pX)
     {
         return 1ull;
     }
-    uint64_t lowerBound = 1ull << log2(pX); 
-    return (pX == lowerBound) ? pX : (lowerBound << 1);
+    return 1ull << ceilLog2(pX);
 }
 
 
@@ -393,15 +386,14 @@ inline uint32_t hammingDistanceBase4(uint64_t x, uint64_t y)
 }
 
 
-// Base-4 reverse
-inline uint64_t reverseBase4(uint64_t x)
+// Base-4 reverse, plain version
+inline uint64_t reverseBase4_plain(uint64_t x)
 {
-#if 0
-    static const uint64_t m2  = 0x3333333333333333ULL;
+    static const uint64_t m2 = 0x3333333333333333ULL;
     static const uint64_t m2p = m2 << 2;
-    static const uint64_t m4  = 0x0F0F0F0F0F0F0F0FULL;
+    static const uint64_t m4 = 0x0F0F0F0F0F0F0F0FULL;
     static const uint64_t m4p = m4 << 4;
-    static const uint64_t m8  = 0x00FF00FF00FF00FFULL;
+    static const uint64_t m8 = 0x00FF00FF00FF00FFULL;
     static const uint64_t m8p = m8 << 8;
     static const uint64_t m16 = 0x0000FFFF0000FFFFULL;
     static const uint64_t m16p = m16 << 16;
@@ -414,7 +406,12 @@ inline uint64_t reverseBase4(uint64_t x)
     x = ((x & m16) << 16) | ((x & m16p) >> 16);
     x = ((x & m32) << 32) | ((x & m32p) >> 32);
     return x;
-#else
+}
+
+
+// Base-4 reverse, byteswap version
+inline uint64_t reverseBase4_byteswap(uint64_t x)
+{
     static const uint64_t m2 = 0x3333333333333333ULL;
     static const uint64_t m2p = m2 << 2;
     static const uint64_t m4 = 0x0F0F0F0F0F0F0F0FULL;
@@ -423,7 +420,13 @@ inline uint64_t reverseBase4(uint64_t x)
     x = ((x & m2) << 2) | ((x & m2p) >> 2);
     x = ((x & m4) << 4) | ((x & m4p) >> 4);
     return Gossamer::byte_swap_64(x);
-#endif
+}
+
+
+// Base-4 reverse, byteswap version
+inline uint64_t reverseBase4(uint64_t x)
+{
+    return reverseBase4_byteswap(x);
 }
 
 
@@ -494,16 +497,38 @@ binomialConfidenceInterval(uint64_t m, uint64_t n, double z = 1.96)
 }
 
 
-// Base-2^64 expansion of the golden ratio, useful for hash seeds.
-constexpr uint64_t sPhi0 = 0x9e3779b97f4a7c15ull;
-constexpr uint64_t sPhi1 = 0xf39cc0605cedc834ull;
-constexpr uint64_t sPhi2 = 0x1082276bf3a27251ull;
-constexpr uint64_t sPhi3 = 0xf86c6a11d0c18e95ull;
-constexpr uint64_t sPhi4 = 0x2767f0b153d27b7full;
-constexpr uint64_t sPhi5 = 0x0347045b5bf1827full;
-constexpr uint64_t sPhi6 = 0x01886f0928403002ull;
-constexpr uint64_t sPhi7 = 0xc1d64ba40f335e36ull;
+namespace detail {
+    // These constants were found via a genetic algorithm,
+    // optimising for avalanche coefficient.
+    constexpr uint64_t sHashLo1 = 0x124b34c732f4a485ull;
+    constexpr uint64_t sHashLo2 = 0x6fafc7de1f728990ull;
+    constexpr uint64_t sHashLo3 = 0x9299b5768ee5e36dull;
+    constexpr uint64_t sHashHi1 = 0x4d8271fe7646891full;
+    constexpr uint64_t sHashHi2 = 0x6d48b8a30939437cull;
+    constexpr uint64_t sHashHi3 = 0x122f44ec3b08f41cull;
 
+
+    // Base-2^64 expansion of the golden ratio.
+    constexpr uint64_t sPhi0 = 0x9e3779b97f4a7c15ull;
+    constexpr uint64_t sPhi1 = 0xf39cc0605cedc834ull;
+    constexpr uint64_t sPhi2 = 0x1082276bf3a27251ull;
+    constexpr uint64_t sPhi3 = 0xf86c6a11d0c18e95ull;
+    constexpr uint64_t sPhi4 = 0x2767f0b153d27b7full;
+    constexpr uint64_t sPhi5 = 0x0347045b5bf1827full;
+    constexpr uint64_t sPhi6 = 0x01886f0928403002ull;
+    constexpr uint64_t sPhi7 = 0xc1d64ba40f335e36ull;
+}
+
+
+GOSS_FORCE_INLINE uint64_t hash_word(uint64_t hash, uint64_t w)
+{
+    uint64_t whi = w >> 32;
+    uint64_t wlo = w & 0xFFFFFFFF;
+
+    uint64_t hashlo = (detail::sHashLo1 * whi + detail::sHashLo2 * wlo + detail::sHashLo3 * hash) >> 32;
+    uint64_t hashhi = (detail::sHashHi1 * whi + detail::sHashHi2 * wlo + detail::sHashHi3 * hash) >> 32;
+    return hashlo | (hashhi << 32);
+}
 
 template<typename T>
 inline
@@ -860,25 +885,27 @@ tuned_lower_and_upper_bound(const It& pBegin, const It& pEnd, const T& pLowerKey
 }
 
 
+#if 0
 // Unroll a loop.
 //
 namespace detail {
     template<class T, T... inds, class F>
-    inline constexpr void unrolled_loop(std::integer_sequence<T, inds...>, F&& f) {
+    inline GOSS_FORCE_INLINE void unrolled_loop(std::integer_sequence<T, inds...>, F&& f) {
         (f(std::integral_constant<T, inds>{}), ...);
     }
 }
 
 template<class T, T count, class F>
-inline constexpr void unrolled_loop(F&& f) {
+GOSS_FORCE_INLINE constexpr void unrolled_loop(F&& f) {
     detail::unrolled_loop(std::make_integer_sequence<T, count>{}, std::forward<F>(f));
 }
+#endif
 
 
 // Check if a std::future is ready.
 //
 template<typename T>
-inline bool
+GOSS_FORCE_INLINE bool
 future_is_ready(const std::future<T>& f)
 {
     return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;

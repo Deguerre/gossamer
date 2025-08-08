@@ -50,7 +50,7 @@ BOOST_AUTO_TEST_CASE(numcodebits)
 {
     for (uint64_t n = 0; n <= 64; ++n)
     {
-        BOOST_CHECK_EQUAL(Gossamer::log2(s_ec.numCodes(n)), s_ec.numCodeBits(n));
+        BOOST_CHECK_EQUAL(Gossamer::ceilLog2(s_ec.numCodes(n)), s_ec.numCodeBits(n));
     }
 }
 

@@ -23,6 +23,7 @@
 #include "LineParser.hh"
 #include "RankSelect.hh"
 #include "Timer.hh"
+#include "BackgroundMultiConsumer.hh"
 
 #include <iostream>
 #include <string>

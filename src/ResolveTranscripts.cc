@@ -794,8 +794,8 @@ struct ResolveTranscripts::Impl
         typedef unordered_map<node_t, pair<uint64_t,uint64_t> > index_t;
         index_t mIndex;
         uint64_t mDFOrdering;
-        deque<node_t> mS;
-        deque< vector<node_t> > mSCCs;
+        Queue<node_t> mS;
+        Queue< vector<node_t> > mSCCs;
 
         // The contents of a stack frame.
         struct StackFrame
@@ -818,7 +818,7 @@ struct ResolveTranscripts::Impl
             {
             }
         };
-        deque<StackFrame> mCallStack;
+        Stack<StackFrame> mCallStack;
 
         void scc(node_t pV)
         {
@@ -987,7 +987,7 @@ struct ResolveTranscripts::Impl
 
     vector<SmallBaseVector> mContigs;
 #ifdef RETAIN_UNMAPPED_READS
-    deque< pair<SmallBaseVector,SmallBaseVector> > mUnmappedPairs;
+    Queue< pair<SmallBaseVector,SmallBaseVector> > mUnmappedPairs;
 #endif
     ptr_vector<MappedRead> mReads;
     ptr_vector<VerifiedRead> mVReads;
@@ -1348,7 +1348,7 @@ void
 ResolveTranscripts::Impl::commitEdgeRemove()
 {
     dynamic_bitset<uint64_t> newEdges(mGraph.count());
-    deque<uint32_t> newCounts;
+    Queue<uint32_t> newCounts;
 
     {
         Component& comp = *mComponent;
@@ -2085,8 +2085,8 @@ ResolveTranscripts::Impl::extractTranscriptsYshapeIn(
 
     BOOST_ASSERT(startNodeFound);
 
-    deque<rank_type> rpathUpper;
-    deque<rank_type> rpathLower;
+    Queue<rank_type> rpathUpper;
+    Queue<rank_type> rpathLower;
 
     // Go back along the common path first.
     node_t nn = n;
@@ -2175,8 +2175,8 @@ ResolveTranscripts::Impl::extractTranscriptsYshapeOut(
 
     BOOST_ASSERT(startNodeFound);
 
-    deque<rank_type> rpathUpper;
-    deque<rank_type> rpathLower;
+    Queue<rank_type> rpathUpper;
+    Queue<rank_type> rpathLower;
 
     // Go along the common path first.
     node_t nn = n;
@@ -2265,8 +2265,8 @@ ResolveTranscripts::Impl::extractTranscriptsSimpleBubble(
 
     BOOST_ASSERT(startNodeFound);
 
-    deque<rank_type> rpathUpper;
-    deque<rank_type> rpathLower;
+    Queue<rank_type> rpathUpper;
+    Queue<rank_type> rpathLower;
 
     // Go back along the common path first.
     node_t nn = n;
@@ -2467,7 +2467,7 @@ ResolveTranscripts::Impl::extractTranscriptsComplex(
     dynamic_bitset<uint64_t> seenNodes(comp.nodeCount());
     dynamic_bitset<uint64_t> queuedNodes(comp.nodeCount());
 
-    deque<node_t> q;
+    Queue<node_t> q;
 
     typedef unordered_map<node_t, PathsReachingNode> paths_t;
     paths_t paths;
@@ -2875,7 +2875,7 @@ ResolveTranscripts::Impl::extractTranscriptsComplex(
 
         typedef std::unordered_multimap<rank_type,uint64_t> init_kmer_map_t;
         init_kmer_map_t initialKmerMap;
-        deque<init_kmer_map_t::iterator> entriesToRemove;
+        Queue<init_kmer_map_t::iterator> entriesToRemove;
 
         for (uint64_t j = 0; j < newTranscripts.size(); ++j)
         {
@@ -3317,7 +3317,7 @@ ResolveTranscripts::Impl::breakCyclesComponent(BreakCyclesContext& pCtx)
         componentAsSet[comp.nodeRank(v)] = true;
     }
 
-    deque<node_t> joinNodes;
+    Queue<node_t> joinNodes;
     for (auto& v: pCtx.mComponent)
     {
         comp.fetchInEdges(v, inEdges);
@@ -3548,7 +3548,7 @@ ResolveTranscripts::Impl::breakCyclesSubcomponent(BreakCyclesContext& pCtx)
 #endif
 
     // Visit edges in descending order of number of participating loops.
-    typedef deque< pair<uint64_t,edge_t> > pq_t;
+    typedef Queue< pair<uint64_t,edge_t> > pq_t;
     pq_t pq;
     for (auto& nl: numLoops)
     {

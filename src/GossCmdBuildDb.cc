@@ -601,7 +601,7 @@ GossCmdBuildDb::storeReadLinks(const GossCmdContext& pCxt, const Graph& pG, cons
     EdgeIndex& idx(*idxPtr);
     const PairAligner alnr(pG, entries, idx);
 
-    std::deque<GossReadSequence::Item> items;
+    Queue<GossReadSequence::Item> items;
 
     {
         GossReadSequenceFactoryPtr seqFac

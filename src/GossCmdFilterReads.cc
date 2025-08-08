@@ -183,7 +183,7 @@ GossCmdFilterReads::operator()(const GossCmdContext& pCxt)
 
     KmerSet g(mIn, fac);
 
-    std::deque<GossReadSequence::Item> items;
+    Queue<GossReadSequence::Item> items;
 
     {
         GossReadSequenceFactoryPtr seqFac
